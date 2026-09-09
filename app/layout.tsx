@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Cairo, Tajawal } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -9,14 +9,21 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: "صنايعي.كوم",
+  description: "منصة تربطك بالصنايعية المناسبين لشغلك",
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const cairo = Cairo({
+  variable: "--font-cairo",
   display: "swap",
-  subsets: ["latin"],
+  subsets: ["arabic"],
+});
+
+const tajawal = Tajawal({
+  variable: "--font-tajawal",
+  display: "swap",
+  subsets: ["arabic"],
+  weight: ["400", "500", "700"],
 });
 
 export default function RootLayout({
@@ -25,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`}>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body className={`${cairo.variable} ${tajawal.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
