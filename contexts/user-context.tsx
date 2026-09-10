@@ -1,0 +1,447 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import type { User } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+
+type Profile = {
+  id: string;
+  full_name: string;
+  role: "client" | "craftsman" | "admin" | "team";
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type ClientProfile = {
+  id: string;
+  phone: string;
+  gender: "male" | "female" | null;
+  area: string;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CraftsmanProfile = {
+  id: string;
+  phone: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  experience_years: number | null;
+  areas: string[];
+  shop_address: string | null;
+  verification_status: "pending" | "verified" | "rejected";
+  is_available: boolean;
+  average_response_time_minutes: number | null;
+  response_rate: number;
+  completion_rate: number;
+  temporary_area: string | null;
+  temporary_location_until: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type OnboardingStep = {
+  label: string;
+  completed: boolean;
+};
+
+type UserContextType = {
+  user: User | null;
+  profile: Profile | null;
+  clientProfile: ClientProfile | null;
+  craftsmanProfile: CraftsmanProfile | null;
+
+  onboardingSteps: OnboardingStep[];
+  completedSteps: number;
+  onboardingPercentage: number;
+
+  isFinishedOnboarding: boolean;
+  isLoading: boolean;
+
+  refreshUser: () => Promise<void>;
+  signOut: () => Promise<void>;
+};
+
+const UserContext = createContext<UserContextType | undefined>(
+  undefined,
+);
+
+export function UserProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = createClient();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [clientProfile, setClientProfile] =
+    useState<ClientProfile | null>(null);
+  const [craftsmanProfile, setCraftsmanProfile] =
+    useState<CraftsmanProfile | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+
+  const clearUser = useCallback(() => {
+    setUser(null);
+    setProfile(null);
+    setClientProfile(null);
+    setCraftsmanProfile(null);
+  }, []);
+
+  const loadUser = useCallback(
+    async (authUser: User) => {
+      setUser(authUser);
+
+      const { data: profileData, error: profileError } =
+        await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .maybeSingle();
+
+      if (profileError) {
+        console.error(
+          "Failed to load profile:",
+          profileError,
+        );
+
+        setProfile(null);
+        setClientProfile(null);
+        setCraftsmanProfile(null);
+        return;
+      }
+
+      setProfile(profileData as Profile | null);
+
+      if (!profileData) {
+        setClientProfile(null);
+        setCraftsmanProfile(null);
+        return;
+      }
+
+      if (profileData.role === "client") {
+        const { data, error } = await supabase
+          .from("client_profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error(
+            "Failed to load client profile:",
+            error,
+          );
+        }
+
+        setClientProfile(data as ClientProfile | null);
+        setCraftsmanProfile(null);
+      } else if (profileData.role === "craftsman") {
+        const { data, error } = await supabase
+          .from("craftsman_profiles")
+          .select("*")
+          .eq("id", authUser.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error(
+            "Failed to load craftsman profile:",
+            error,
+          );
+        }
+
+        console.log("craftsman profile", data)
+
+        setCraftsmanProfile(
+          data as CraftsmanProfile | null,
+        );
+        setClientProfile(null);
+      } else {
+        setClientProfile(null);
+        setCraftsmanProfile(null);
+      }
+    },
+    [supabase],
+  );
+
+  const refreshUser = useCallback(async () => {
+    setIsLoading(true);
+
+    try {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser) {
+        clearUser();
+        return;
+      }
+
+      await loadUser(authUser);
+    } catch (error) {
+      console.error("Failed to refresh user:", error);
+      clearUser();
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase, loadUser, clearUser]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initialize = async () => {
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+
+        if (!mounted) return;
+
+        if (!authUser) {
+          clearUser();
+          return;
+        }
+
+        await loadUser(authUser);
+      } catch (error) {
+        console.error(
+          "Failed to initialize user:",
+          error,
+        );
+
+        if (mounted) {
+          clearUser();
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initialize();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+
+        if (
+          event === "SIGNED_OUT" ||
+          !session?.user
+        ) {
+          clearUser();
+          setIsLoading(false);
+          return;
+        }
+
+        await loadUser(session.user);
+
+        if (mounted) {
+          setIsLoading(false);
+        }
+      },
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase, loadUser, clearUser]);
+
+  /*
+   * Onboarding
+   *
+   * The steps are derived here so dashboards don't need
+   * to know how onboarding is calculated.
+   */
+  const onboardingSteps = useMemo<OnboardingStep[]>(() => {
+    if (!profile) {
+      return [];
+    }
+
+    switch (profile.role) {
+      case "client":
+        return [
+          {
+            label: "إضافة صورة شخصية",
+            completed: Boolean(clientProfile?.avatar_url),
+          },
+          {
+            label: "إضافة رقم الهاتف",
+            completed: Boolean(clientProfile?.phone),
+          },
+          {
+            label: "تحديد المنطقة",
+            completed: Boolean(clientProfile?.area),
+          },
+          {
+            label: "تحديد النوع",
+            completed: Boolean(clientProfile?.gender),
+          },
+        ];
+
+      case "craftsman":
+        return [
+          {
+            label: "إضافة صورة شخصية",
+            completed: Boolean(craftsmanProfile?.avatar_url),
+          },
+          {
+            label: "إضافة رقم الهاتف (توثيق الهوية)",
+            completed: Boolean(craftsmanProfile?.phone),
+          },
+          {
+            label: "إضافة نبذة عنك",
+            completed: Boolean(craftsmanProfile?.bio),
+          },
+          {
+            label: "تحديد مناطق العمل",
+            completed: Boolean(
+              craftsmanProfile?.areas?.length,
+            ),
+          },
+          {
+            label: "إضافة عنوان الورشة",
+            completed: Boolean(
+              craftsmanProfile?.shop_address,
+            ),
+          },
+          {
+            label: "إضافة سنوات الخبرة",
+            completed:
+              craftsmanProfile?.experience_years !== null &&
+              craftsmanProfile?.experience_years !==
+                undefined,
+          },
+        ];
+
+      case "admin":
+      case "team":
+        return [];
+
+      default:
+        return [];
+    }
+  }, [
+    profile,
+    clientProfile,
+    craftsmanProfile,
+  ]);
+
+  const completedSteps = useMemo(
+    () =>
+      onboardingSteps.filter(
+        (step) => step.completed,
+      ).length,
+    [onboardingSteps],
+  );
+
+  const onboardingPercentage = useMemo(() => {
+    if (!onboardingSteps.length) {
+      return 0;
+    }
+
+    return Math.round(
+      (completedSteps / onboardingSteps.length) * 100,
+    );
+  }, [completedSteps, onboardingSteps.length]);
+
+  const isFinishedOnboarding = useMemo(() => {
+    if (!user || !profile) {
+      return false;
+    }
+
+    switch (profile.role) {
+      case "client":
+        return (
+          clientProfile !== null &&
+          onboardingPercentage === 100
+        );
+
+      case "craftsman":
+        return (
+          craftsmanProfile !== null &&
+          onboardingPercentage === 100
+        );
+
+      case "admin":
+      case "team":
+        return true;
+
+      default:
+        return false;
+    }
+  }, [
+    user,
+    profile,
+    clientProfile,
+    craftsmanProfile,
+    onboardingPercentage,
+  ]);
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    clearUser();
+  }, [supabase, clearUser]);
+
+  const value = useMemo(
+    () => ({
+      user,
+      profile,
+      clientProfile,
+      craftsmanProfile,
+
+      onboardingSteps,
+      completedSteps,
+      onboardingPercentage,
+
+      isFinishedOnboarding,
+      isLoading,
+      refreshUser,
+      signOut,
+    }),
+    [
+      user,
+      profile,
+      clientProfile,
+      craftsmanProfile,
+      onboardingSteps,
+      completedSteps,
+      onboardingPercentage,
+      isFinishedOnboarding,
+      isLoading,
+      refreshUser,
+      signOut,
+    ],
+  );
+
+  return (
+    <UserContext.Provider value={value}>
+      {children}
+    </UserContext.Provider>
+  );
+}
+
+export function useUser() {
+  const context = useContext(UserContext);
+
+  if (!context) {
+    throw new Error(
+      "useUser must be used inside UserProvider",
+    );
+  }
+
+  return context;
+}

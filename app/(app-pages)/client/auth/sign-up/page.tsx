@@ -29,7 +29,7 @@ export default function ClientSignupPage() {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           لديك حساب بالفعل؟{" "}
           <Link
-            href="/login"
+            href="/auth/login"
             className="font-medium text-foreground underline underline-offset-4"
           >
             تسجيل الدخول

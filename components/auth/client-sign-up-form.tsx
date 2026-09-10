@@ -16,10 +16,12 @@ import {
   RadioGroupItem,
 } from "@/components/ui/radio-group";
 import createNewUser from "@/actions/auth/createNewUser";
+import { useRouter } from "next/navigation";
 
 export function ClientSignupForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter()
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
@@ -51,11 +53,7 @@ export function ClientSignupForm() {
       return;
     }
 
-    // TODO:
-    // Create client_profiles after successful signup.
-    // This can be done in a separate onboarding step.
-
-    window.location.href = "/dashboard";
+    router.push("/confirm")
   }
 
   return (

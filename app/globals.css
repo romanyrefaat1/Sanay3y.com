@@ -94,19 +94,11 @@
   }
 
   .dark {
-    /* ================================
-       BRAND
-       ================================= */
-
     --background: 222 47% 7%;
     --foreground: 210 40% 98%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-
-    /* ================================
-       SURFACES
-       ================================= */
 
     --card: 222 47% 10%;
     --card-foreground: 210 40% 98%;
@@ -123,10 +115,6 @@
     --accent: 217 33% 20%;
     --accent-foreground: 213 94% 78%;
 
-    /* ================================
-       STATUS
-       ================================= */
-
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
@@ -139,10 +127,6 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
-    /* ================================
-       VERIFICATION
-       ================================= */
-
     --verified: 142 71% 45%;
     --verified-foreground: 0 0% 100%;
 
@@ -152,27 +136,15 @@
     --rejected: 0 63% 45%;
     --rejected-foreground: 0 0% 100%;
 
-    /* ================================
-       AVAILABILITY
-       ================================= */
-
     --available: 142 71% 45%;
     --available-foreground: 0 0% 100%;
 
     --unavailable: 0 63% 45%;
     --unavailable-foreground: 0 0% 100%;
 
-    /* ================================
-       BORDERS / INPUTS
-       ================================= */
-
     --border: 217 33% 20%;
     --input: 217 33% 20%;
     --ring: 217 91% 60%;
-
-    /* ================================
-       CHARTS
-       ================================= */
 
     --chart-1: 217 91% 60%;
     --chart-2: 142 71% 45%;
@@ -190,7 +162,14 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-tajawal), sans-serif;
+    font-size: 1.0625rem; /* 17px */
+    font-weight: 400;
+    line-height: 1.7;
   }
+
+  /* ================================
+     TYPOGRAPHY
+     ================================= */
 
   h1,
   h2,
@@ -199,5 +178,79 @@
   h5,
   h6 {
     font-family: var(--font-cairo), sans-serif;
+    color: hsl(var(--foreground));
+    letter-spacing: -0.015em;
+  }
+
+  h1 {
+    font-size: 2.5rem; /* 40px */
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 2.125rem; /* 34px */
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  h3 {
+    font-size: 1.75rem; /* 28px */
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  h4 {
+    font-size: 1.375rem; /* 22px */
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  h5 {
+    font-size: 1.1875rem; /* 19px */
+    font-weight: 600;
+    line-height: 1.45;
+  }
+
+  h6 {
+    font-size: 1.0625rem; /* 17px */
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  p {
+    font-size: 1.0625rem; /* 17px */
+    font-weight: 400;
+    line-height: 1.7;
+  }
+
+  small {
+    font-size: 0.9375rem; /* 15px */
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  strong,
+  b {
+    font-weight: 700;
+  }
+
+  label {
+    font-size: 0.9375rem; /* 15px */
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  button {
+    font-family: var(--font-tajawal), sans-serif;
+    font-size: 1rem; /* 16px */
+    font-weight: 500;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: var(--font-tajawal), sans-serif;
+    font-size: 1rem; /* 16px */
   }
 }
