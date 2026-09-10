@@ -337,20 +337,10 @@ export default function ClientDashboardIndex() {
 
                             <div className="flex flex-col gap-3 sm:flex-row">
                                 <Link
-                                    href="/find/jobs"
+                                    href="/client/find"
                                     className="w-full sm:w-auto"
                                 >
                                     <Button className="w-full gap-2 sm:w-auto">
-                                        <Search className="h-4 w-4" />
-                                        ضيف شغلانة جديدة
-                                    </Button>
-                                </Link>
-
-                                <Link
-                                    href="/find/craftsmen"
-                                    className="w-full sm:w-auto"
-                                >
-                                    <Button variant={"outline"} className="w-full gap-2 sm:w-auto">
                                         <Search className="h-4 w-4" />
                                         ابحث عن صنايعي
                                     </Button>
