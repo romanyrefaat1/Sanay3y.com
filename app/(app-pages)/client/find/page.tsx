@@ -6,6 +6,7 @@ import {
     BadgeCheck,
     BriefcaseBusiness,
     CheckCircle2,
+    ChevronDown,
     Clock3,
     MapPin,
     Search,
@@ -17,7 +18,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import {
     Select,
     SelectContent,
@@ -33,6 +48,13 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import {
+    Avatar,
+    AvatarBadge,
+    AvatarFallback,
+    AvatarImage,
+} from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { createClient } from "@/lib/supabase/client";
 
@@ -209,12 +231,10 @@ export default function ClientFindPage() {
         const values = new Set<string>();
 
         craftsmen.forEach((craftsman) => {
-            craftsmen.forEach((craftsman) => {
-                craftsman.areas.forEach((item) => {
-                    if (item?.trim()) {
-                        values.add(item.trim());
-                    }
-                });
+            craftsman.areas.forEach((item) => {
+                if (item?.trim()) {
+                    values.add(item.trim());
+                }
             });
         });
 
@@ -314,66 +334,75 @@ export default function ClientFindPage() {
 
     return (
         <div
-            dir="rtl"
-            className="min-h-screen bg-background"
         >
-            <div className="border-b bg-card">
-                <div className="mx-auto flex h-12 w-full max-w-6xl items-center px-4 text-sm">
-                    <Link
-                        href="/"
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                        الرئيسية
-                    </Link>
+            {/* Breadcrumb */}
+                <div className="mx-auto flex w-full max-w-6xl items-center px-4">
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            <BreadcrumbItem>
+                                <BreadcrumbLink asChild>
+                                    <Link
+                                        href="/"
+                                        className="text-sm"
+                                    >
+                                        الرئيسية
+                                    </Link>
+                                </BreadcrumbLink>
+                            </BreadcrumbItem>
 
-                    <span className="mx-2 text-muted-foreground/40">
-                        /
-                    </span>
+                            <BreadcrumbSeparator />
 
-                    <span className="font-medium text-foreground">
-                        ابحث عن صنايعي
-                    </span>
+                            <BreadcrumbItem>
+                                <BreadcrumbPage className="text-sm font-medium">
+                                    ابحث عن صنايعي
+                                </BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </BreadcrumbList>
+                    </Breadcrumb>
                 </div>
-            </div>
-
-            <main className="mx-auto w-full max-w-6xl px-4 py-8">
-                <section className="mb-7">
-                    <div className="mb-5">
+            <main className="mx-auto w-full max-w-6xl px-4 py-7 sm:py-9">
+                {/* Page header */}
+                <section>
+                    <div className="max-w-2xl">
                         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                             ابحث عن صنايعي
                         </h1>
 
-                        <p className="mt-2 text-base text-muted-foreground">
-                            اختار الصنايعي المناسب لشغلك في
-                            منطقتك
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
+                            لاقي الصنايعي المناسب لشغلك في منطقتك
                         </p>
                     </div>
 
-                    <div className="relative max-w-3xl">
-                        <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                    {/* Search */}
+                    <div className="mt-6 max-w-3xl">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute right-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
 
-                        <Input
-                            value={search}
-                            onChange={(event) =>
-                                setSearch(event.target.value)
-                            }
-                            placeholder="ابحث باسم الصنايعي أو التخصص أو المنطقة..."
-                            className="h-13 rounded-xl bg-card pr-11 text-base shadow-sm"
-                        />
+                            <Input
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                                placeholder="ابحث باسم الصنايعي أو التخصص أو المنطقة..."
+                                className="h-12 rounded-lg bg-background pr-11 pl-11 text-sm shadow-sm"
+                            />
 
-                        {search && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setSearch("")}
-                                className="absolute left-2 top-1/2 h-9 w-9 -translate-y-1/2 text-muted-foreground"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
+                            {search && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setSearch("")}
+                                    className="absolute left-1.5 top-1/2 size-9 -translate-y-1/2 text-muted-foreground"
+                                    aria-label="مسح البحث"
+                                >
+                                    <X className="size-4" />
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
+                    {/* Work types */}
                     <div className="mt-4 overflow-x-auto pb-1">
                         <div className="flex min-w-max gap-2">
                             <Button
@@ -416,10 +445,11 @@ export default function ClientFindPage() {
                     </div>
                 </section>
 
+                {/* Active filters */}
                 {(hasFilters || search) && (
-                    <div className="mb-5 flex flex-wrap items-center gap-2">
+                    <div className="mt-5 flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-muted-foreground">
-                            الفلاتر:
+                            الفلاتر النشطة
                         </span>
 
                         {search && (
@@ -479,16 +509,18 @@ export default function ClientFindPage() {
                             variant="ghost"
                             size="sm"
                             onClick={clearAll}
-                            className="h-8 text-sm text-primary"
+                            className="h-8 px-2 text-sm text-primary"
                         >
                             مسح الكل
                         </Button>
                     </div>
                 )}
 
-                <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-                    <main className="min-w-0 lg:order-1">
-                        <div className="mb-4 flex items-center justify-between">
+                {/* Results + filters */}
+                <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_250px]">
+                    {/* Results */}
+                    <section className="min-w-0 lg:order-1">
+                        <div className="mb-4 flex items-center justify-between gap-4">
                             <div>
                                 <p className="text-base font-semibold">
                                     {isLoading
@@ -506,81 +538,78 @@ export default function ClientFindPage() {
                                     )}
                             </div>
 
-                            <div className="lg:hidden">
-                                <Sheet>
-                                    <SheetTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="gap-2"
-                                        >
-                                            <SlidersHorizontal className="h-4 w-4" />
-                                            تصفية
-
-                                            {activeFilterCount >
-                                                0 && (
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="min-w-5 justify-center rounded-full px-1.5"
-                                                >
-                                                    {
-                                                        activeFilterCount
-                                                    }
-                                                </Badge>
-                                            )}
-                                        </Button>
-                                    </SheetTrigger>
-
-                                    <SheetContent
-                                        side="right"
-                                        className="w-[320px] sm:w-[380px]"
+                            {/* Mobile filters */}
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="shrink-0 gap-2 lg:hidden"
                                     >
-                                        <SheetHeader className="text-right">
-                                            <SheetTitle className="text-lg">
-                                                تصفية النتائج
-                                            </SheetTitle>
-                                        </SheetHeader>
+                                        <SlidersHorizontal className="size-4" />
+                                        تصفية
 
-                                        <div className="mt-7">
-                                            <FilterContent
-                                                workType={
-                                                    workType
+                                        {activeFilterCount >
+                                            0 && (
+                                            <Badge
+                                                variant="secondary"
+                                                className="min-w-5 justify-center rounded-full px-1.5"
+                                            >
+                                                {
+                                                    activeFilterCount
                                                 }
-                                                setWorkType={
-                                                    setWorkType
-                                                }
-                                                experience={
-                                                    experience
-                                                }
-                                                setExperience={
-                                                    setExperience
-                                                }
-                                                area={area}
-                                                setArea={setArea}
-                                                areas={allAreas}
-                                                availableOnly={
-                                                    availableOnly
-                                                }
-                                                setAvailableOnly={
-                                                    setAvailableOnly
-                                                }
-                                            />
+                                            </Badge>
+                                        )}
+                                    </Button>
+                                </SheetTrigger>
 
-                                            {hasFilters && (
-                                                <Button
-                                                    variant="outline"
-                                                    className="mt-7 w-full"
-                                                    onClick={
-                                                        clearFilters
-                                                    }
-                                                >
-                                                    مسح الفلاتر
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </SheetContent>
-                                </Sheet>
-                            </div>
+                                <SheetContent
+                                    side="right"
+                                    className="w-[320px] sm:w-[380px]"
+                                >
+                                    <SheetHeader className="text-right">
+                                        <SheetTitle>
+                                            تصفية النتائج
+                                        </SheetTitle>
+                                    </SheetHeader>
+
+                                    <div className="mt-7">
+                                        <FilterContent
+                                            workType={workType}
+                                            setWorkType={
+                                                setWorkType
+                                            }
+                                            experience={
+                                                experience
+                                            }
+                                            setExperience={
+                                                setExperience
+                                            }
+                                            area={area}
+                                            setArea={setArea}
+                                            areas={allAreas}
+                                            availableOnly={
+                                                availableOnly
+                                            }
+                                            setAvailableOnly={
+                                                setAvailableOnly
+                                            }
+                                        />
+
+                                        {hasFilters && (
+                                            <Button
+                                                variant="outline"
+                                                className="mt-7 w-full"
+                                                onClick={
+                                                    clearFilters
+                                                }
+                                            >
+                                                مسح الفلاتر
+                                            </Button>
+                                        )}
+                                    </div>
+                                </SheetContent>
+                            </Sheet>
                         </div>
 
                         {isLoading ? (
@@ -622,19 +651,20 @@ export default function ClientFindPage() {
                                 )}
                             </div>
                         )}
-                    </main>
+                    </section>
 
+                    {/* Desktop filters */}
                     <aside className="hidden lg:order-2 lg:block">
                         <div className="sticky top-6">
-                            <Card>
+                            <Card className="bg-background">
                                 <CardContent className="p-5">
-                                    <div className="mb-6 flex items-center justify-between">
+                                    <div className="flex items-start justify-between gap-4">
                                         <div>
                                             <h2 className="text-base font-bold">
                                                 تصفية النتائج
                                             </h2>
 
-                                            <p className="mt-1 text-sm text-muted-foreground">
+                                            <p className="mt-1 text-sm leading-5 text-muted-foreground">
                                                 حدد اللي يناسب شغلك
                                             </p>
                                         </div>
@@ -647,12 +677,14 @@ export default function ClientFindPage() {
                                                 onClick={
                                                     clearFilters
                                                 }
-                                                className="text-primary"
+                                                className="h-8 px-2 text-primary"
                                             >
                                                 مسح
                                             </Button>
                                         )}
                                     </div>
+
+                                    <Separator className="my-5" />
 
                                     <FilterContent
                                         workType={workType}
@@ -684,27 +716,27 @@ export default function ClientFindPage() {
 function FilterBadge({
     label,
     onRemove,
-}: {
+}: { 
     label: string;
     onRemove: () => void;
 }) {
     return (
         <Badge
             variant="secondary"
-            className="h-8 gap-1.5 rounded-full px-3 text-sm font-medium"
+            className="h-8 max-w-[220px] gap-1 rounded-full px-3 text-sm font-medium"
         >
-            <span className="max-w-[180px] truncate">
-                {label}
-            </span>
+            <span className="truncate">{label}</span>
 
-            <button
+            <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onRemove}
-                className="rounded-full opacity-70 transition-opacity hover:opacity-100"
+                className="size-5 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                 aria-label={`إزالة ${label}`}
             >
-                <X className="h-3.5 w-3.5" />
-            </button>
+                <X className="size-3.5" />
+            </Button>
         </Badge>
     );
 }
@@ -731,17 +763,23 @@ function FilterContent({
     setAvailableOnly: (value: boolean) => void;
 }) {
     return (
-        <div className="space-y-6">
-            <div>
-                <label className="mb-2 block text-sm font-semibold">
+        <div className="space-y-5">
+            <div className="space-y-2">
+                <Label
+                    htmlFor="experience"
+                    className="text-sm font-semibold"
+                >
                     الخبرة
-                </label>
+                </Label>
 
                 <Select
                     value={experience}
                     onValueChange={setExperience}
                 >
-                    <SelectTrigger className="h-10 text-sm">
+                    <SelectTrigger
+                        id="experience"
+                        className="h-10 text-sm"
+                    >
                         <SelectValue />
                     </SelectTrigger>
 
@@ -761,16 +799,22 @@ function FilterContent({
                 </Select>
             </div>
 
-            <div>
-                <label className="mb-2 block text-sm font-semibold">
+            <div className="space-y-2">
+                <Label
+                    htmlFor="area"
+                    className="text-sm font-semibold"
+                >
                     المنطقة
-                </label>
+                </Label>
 
                 <Select
                     value={area}
                     onValueChange={setArea}
                 >
-                    <SelectTrigger className="h-10 text-sm">
+                    <SelectTrigger
+                        id="area"
+                        className="h-10 text-sm"
+                    >
                         <SelectValue placeholder="كل المناطق" />
                     </SelectTrigger>
 
@@ -793,7 +837,7 @@ function FilterContent({
 
             <Separator />
 
-            <label className="flex cursor-pointer items-start gap-3">
+            <div className="flex items-start gap-3">
                 <Checkbox
                     id="available-only"
                     checked={availableOnly}
@@ -805,16 +849,19 @@ function FilterContent({
                     className="mt-0.5"
                 />
 
-                <span>
+                <Label
+                    htmlFor="available-only"
+                    className="cursor-pointer"
+                >
                     <span className="block text-sm font-semibold">
                         متاح للعمل الآن
                     </span>
 
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">
-                        عرض الصنايعية المتاحين حالياً
+                    <span className="mt-1 block text-sm font-normal leading-5 text-muted-foreground">
+                        اعرض الصنايعية المتاحين للطلبات الجديدة
                     </span>
-                </span>
-            </label>
+                </Label>
+            </div>
         </div>
     );
 }
@@ -828,97 +875,96 @@ function CraftsmanRow({
         craftsman.average_response_time_minutes,
     );
 
+    const hasAreas = craftsman.areas.length > 0;
+
     return (
-        <Card className="transition-shadow duration-200 hover:shadow-md">
+        <Card className="bg-background transition-shadow duration-200 hover:shadow-md">
             <CardContent className="p-5 sm:p-6">
-                <div className="flex gap-4 sm:gap-5">
-                    <div className="relative shrink-0">
-                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border bg-muted shadow-sm sm:h-20 sm:w-20">
-                            {craftsman.avatar_url ? (
-                                <img
-                                    src={
-                                        craftsman.avatar_url
-                                    }
-                                    alt={
-                                        craftsman.full_name
-                                    }
-                                    className="h-full w-full object-cover"
-                                />
-                            ) : (
-                                <span className="text-base font-bold text-muted-foreground">
-                                    {getInitials(
-                                        craftsman.full_name,
-                                    )}
+                <div className="flex items-start gap-4 sm:gap-5">
+                    {/* Avatar */}
+                    <Avatar className="size-16 shrink-0 border bg-muted shadow-sm sm:size-20">
+                        <AvatarImage
+                            src={
+                                craftsman.avatar_url ??
+                                undefined
+                            }
+                            alt={craftsman.full_name}
+                            className="object-cover"
+                        />
+
+                        <AvatarFallback className="text-base font-bold text-muted-foreground sm:text-lg">
+                            {getInitials(
+                                craftsman.full_name,
+                            )}
+                        </AvatarFallback>
+
+                        <AvatarBadge
+                            className={
+                                craftsman.is_available
+                                    ? "size-4 border-[3px] border-background bg-[hsl(var(--available))] sm:size-[18px]"
+                                    : "size-4 border-[3px] border-background bg-muted-foreground/40 sm:size-[18px]"
+                            }
+                        />
+                    </Avatar>
+
+                    <div className="min-w-0 flex-1">
+                        {/* Location + profession */}
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
+                            {hasAreas && (
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                    <MapPin className="size-4 shrink-0" />
+
+                                    <span className="truncate">
+                                        {craftsman.areas
+                                            .slice(0, 3)
+                                            .join("، ")}
+
+                                        {craftsman.areas.length >
+                                            3 &&
+                                            ` +${craftsman.areas.length - 3}`}
+                                    </span>
                                 </span>
+                            )}
+
+                            {craftsman.work_type && (
+                                <>
+                                    {hasAreas && (
+                                        <span className="text-muted-foreground/40">
+                                            •
+                                        </span>
+                                    )}
+
+                                    <Badge
+                                        variant="secondary"
+                                        className="h-6 rounded-md px-2 text-xs font-medium"
+                                    >
+                                        {craftsman.work_type}
+                                    </Badge>
+                                </>
                             )}
                         </div>
 
-                        <span
-                            className={`absolute bottom-0 left-0 h-4 w-4 rounded-full border-[3px] border-card ${
-                                craftsman.is_available
-                                    ? "bg-[hsl(var(--available))]"
-                                    : "bg-muted-foreground/40"
-                            }`}
-                        />
-                    </div>
+                        {/* Name + CTA */}
+                        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <Link
+                                href={`/profile/${craftsman.id}`}
+                                className="group flex min-w-0 items-center gap-2"
+                            >
+                                <span className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary sm:text-xl">
+                                    {craftsman.full_name}
+                                </span>
 
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Link
-                                        href={`/profile?id=${craftsman.id}`}
-                                        className="text-lg font-bold text-foreground transition-colors hover:text-primary"
-                                    >
-                                        {craftsman.full_name}
-                                    </Link>
-
-                                    <BadgeCheck className="h-5 w-5 shrink-0 text-[hsl(var(--verified))]" />
-
-                                    {craftsman.work_type && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="h-7 rounded-md px-2.5 text-sm font-semibold"
-                                        >
-                                            {
-                                                craftsman.work_type
-                                            }
-                                        </Badge>
-                                    )}
-                                </div>
-
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    <Badge
-                                        variant={
-                                            craftsman.is_available
-                                                ? "default"
-                                                : "outline"
-                                        }
-                                        className={
-                                            craftsman.is_available
-                                                ? "h-7 bg-[hsl(var(--available))] px-2.5 text-sm font-medium hover:bg-[hsl(var(--available))]"
-                                                : "h-7 px-2.5 text-sm font-medium"
-                                        }
-                                    >
-                                        <span
-                                            className={`ml-1.5 h-1.5 w-1.5 rounded-full ${
-                                                craftsman.is_available
-                                                    ? "bg-white"
-                                                    : "bg-muted-foreground"
-                                            }`}
-                                        />
-
-                                        {craftsman.is_available
-                                            ? "متاح للعمل"
-                                            : "غير متاح حالياً"}
-                                    </Badge>
-                                </div>
-                            </div>
+                                <BadgeCheck
+                                    className="size-5 shrink-0 text-[hsl(var(--verified))]"
+                                    aria-label="حساب موثق"
+                                />
+                            </Link>
 
                             <Button
                                 asChild
                                 size="sm"
-                                className="h-10 shrink-0 px-5 text-sm font-semibold"
+                                variant="outline"
+                                className="h-9 shrink-0 px-4 text-sm font-semibold"
                             >
                                 <Link
                                     href={`/profile?id=${craftsman.id}`}
@@ -928,60 +974,139 @@ function CraftsmanRow({
                             </Button>
                         </div>
 
+                        {/* Bio */}
                         {craftsman.bio && (
-                            <p className="mt-4 line-clamp-2 text-[15px] leading-7 text-muted-foreground">
-                                {craftsman.bio}
-                            </p>
+                            <CollapsibleBio
+                                bio={craftsman.bio}
+                                profileUrl={`/profile?id=${craftsman.id}`}
+                            />
                         )}
 
-                        <div className="mt-4">
-                            <Separator />
-                        </div>
+                        <Separator className="my-4" />
 
-                        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-sm text-muted-foreground">
-                            {craftsman.areas.length > 0 && (
-                                <span className="flex min-w-0 items-center gap-2">
-                                    <MapPin className="h-4 w-4 shrink-0" />
-
-                                    <span className="truncate">
-                                        {craftsman.areas
-                                            .slice(0, 3)
-                                            .join("، ")}
-
-                                        {craftsman.areas
-                                            .length > 3 &&
-                                            ` +${craftsman.areas.length - 3}`}
-                                    </span>
-                                </span>
-                            )}
-
-                            <span className="flex items-center gap-2">
-                                <BriefcaseBusiness className="h-4 w-4 shrink-0" />
-                                {formatExperience(
+                        {/* Professional information */}
+                        <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm text-muted-foreground">
+                            <InfoItem
+                                icon={BriefcaseBusiness}
+                                label={formatExperience(
                                     craftsman.experience_years,
                                 )}
-                            </span>
+                            />
 
                             {responseTime && (
-                                <span className="flex items-center gap-2">
-                                    <Clock3 className="h-4 w-4 shrink-0" />
-                                    يرد خلال {responseTime}
-                                </span>
+                                <InfoItem
+                                    icon={Clock3}
+                                    label={`يرد خلال ${responseTime}`}
+                                />
                             )}
 
                             {craftsman.completion_rate >
                                 0 && (
-                                <span className="flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                    {craftsman.completion_rate}%
-                                    إتمام
-                                </span>
+                                <InfoItem
+                                    icon={CheckCircle2}
+                                    label={`${craftsman.completion_rate}% إتمام`}
+                                />
+                            )}
+
+                            {craftsman.response_rate > 0 && (
+                                <InfoItem
+                                    icon={CheckCircle2}
+                                    label={`${craftsman.response_rate}% رد`}
+                                />
                             )}
                         </div>
                     </div>
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+function CollapsibleBio({
+    bio,
+    profileUrl,
+}: {
+    bio: string;
+    profileUrl: string;
+}) {
+    const [open, setOpen] = useState(false);
+
+    const shouldCollapse = bio.length > 180;
+
+    if (!shouldCollapse) {
+        return (
+            <p className="mt-3 text-[15px] leading-7 text-muted-foreground">
+                {bio}
+            </p>
+        );
+    }
+
+    return (
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="mt-3"
+        >
+            <div className="relative">
+                <p
+                    className={
+                        open
+                            ? "text-[15px] leading-7 text-muted-foreground"
+                            : "line-clamp-2 text-[15px] leading-7 text-muted-foreground"
+                    }
+                >
+                    {bio}
+                </p>
+
+                {!open && (
+                    <CollapsibleTrigger asChild>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            className="h-auto px-0 text-sm font-semibold text-primary"
+                        >
+                            عرض المزيد
+                        </Button>
+                    </CollapsibleTrigger>
+                )}
+
+                {open && (
+                    <div className="mt-1 flex items-center gap-3">
+                        <CollapsibleTrigger asChild>
+                            <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto px-0 text-sm font-semibold text-primary"
+                            >
+                                عرض أقل
+                            </Button>
+                        </CollapsibleTrigger>
+
+                        <Link
+                            href={profileUrl}
+                            className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            الملف الشخصي
+                        </Link>
+                    </div>
+                )}
+            </div>
+        </Collapsible>
+    );
+}
+
+function InfoItem({
+    icon: Icon,
+    label,
+}: {
+    icon: typeof BriefcaseBusiness;
+    label: string;
+}) {
+    return (
+        <span className="flex items-center gap-2">
+            <Icon className="size-4 shrink-0" />
+            <span>{label}</span>
+        </span>
     );
 }
 
@@ -997,19 +1122,13 @@ function EmptyState({
     const isError = type === "error";
 
     return (
-        <Card>
+        <Card className="bg-background">
             <CardContent className="flex min-h-[340px] flex-col items-center justify-center p-8 text-center">
-                <div
-                    className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                        isError
-                            ? "bg-destructive/10"
-                            : "bg-primary/10"
-                    }`}
-                >
+                <div className="flex size-14 items-center justify-center rounded-full bg-muted">
                     {isError ? (
-                        <X className="h-7 w-7 text-destructive" />
+                        <X className="size-6 text-destructive" />
                     ) : (
-                        <Search className="h-7 w-7 text-primary" />
+                        <Search className="size-6 text-muted-foreground" />
                     )}
                 </div>
 
@@ -1043,28 +1162,32 @@ function EmptyState({
 
 function CraftsmanSkeleton() {
     return (
-        <Card>
-            <CardContent className="animate-pulse p-5 sm:p-6">
-                <div className="flex gap-4">
-                    <div className="h-16 w-16 shrink-0 rounded-full bg-muted sm:h-20 sm:w-20" />
+        <Card className="bg-background">
+            <CardContent className="p-5 sm:p-6">
+                <div className="flex items-start gap-4 sm:gap-5">
+                    <Skeleton className="size-16 shrink-0 rounded-full sm:size-20" />
 
                     <div className="min-w-0 flex-1">
-                        <div className="flex justify-between gap-4">
-                            <div className="space-y-3">
-                                <div className="h-5 w-40 rounded bg-muted" />
-                                <div className="h-7 w-24 rounded-md bg-muted" />
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1 space-y-3">
+                                <Skeleton className="h-4 w-40" />
+                                <Skeleton className="h-6 w-44" />
                             </div>
 
-                            <div className="h-10 w-32 rounded-md bg-muted" />
+                            <Skeleton className="h-9 w-32 shrink-0" />
                         </div>
 
-                        <div className="mt-5 space-y-2">
-                            <div className="h-4 w-full rounded bg-muted" />
-                            <div className="h-4 w-4/5 rounded bg-muted" />
+                        <div className="mt-4 space-y-2">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-4/5" />
                         </div>
 
-                        <div className="mt-5 border-t pt-4">
-                            <div className="h-4 w-3/5 rounded bg-muted" />
+                        <Separator className="my-4" />
+
+                        <div className="flex gap-5">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-4 w-28" />
+                            <Skeleton className="h-4 w-20" />
                         </div>
                     </div>
                 </div>
