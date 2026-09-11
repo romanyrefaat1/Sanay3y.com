@@ -8,10 +8,14 @@ const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
 
+// Google Search Console Verification
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "صنايعي.كوم",
   description: "منصة تربطك بالصنايعية المناسبين لشغلك",
+  verification: {
+    google: "Sai167nQznsV1gUqyWpdBrUPe6QxEf4KWxcfPfkng44",
+  },
 };
 
 const cairo = Cairo({
@@ -41,9 +45,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <UserProvider>
-          {children}
-          </UserProvider>
+          <UserProvider>{children}</UserProvider>
         </ThemeProvider>
       </body>
     </html>
