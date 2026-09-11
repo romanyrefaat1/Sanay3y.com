@@ -342,10 +342,10 @@ export default function ClientFindPage() {
                             <BreadcrumbItem>
                                 <BreadcrumbLink asChild>
                                     <Link
-                                        href="/"
+                                        href="/dashboard"
                                         className="text-sm"
                                     >
-                                        الرئيسية
+                                        لوحة التحكم
                                     </Link>
                                 </BreadcrumbLink>
                             </BreadcrumbItem>
