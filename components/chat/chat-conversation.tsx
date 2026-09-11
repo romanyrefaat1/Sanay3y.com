@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { format } from "date-fns";
+import { ar } from "date-fns/locale";
 import {
     ArrowRight,
     BriefcaseBusiness,
+    CalendarDays,
     CheckCircle2,
+    ChevronDown,
     ChevronLeft,
+    Clock3,
     Loader2,
     MapPin,
     MessageSquare,
@@ -16,6 +21,7 @@ import {
 import {
     FormEvent,
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from "react";
@@ -30,16 +36,31 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-    Card,
-    CardContent,
-} from "@/components/ui/card";
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -74,11 +95,20 @@ type ChatConversationProps = {
         status: string;
         area: string;
         budget: number;
+        requested_at: string | null;
+        agreed_scheduled_at: string | null;
     };
 
     initialMessages: Message[];
 
     canSend: boolean;
+};
+
+type RealtimeJob = {
+    id: string;
+    status: string;
+    requested_at: string | null;
+    agreed_scheduled_at: string | null;
 };
 
 const statusConfig: Record<
@@ -125,6 +155,15 @@ const formatDate = (date: string) =>
         month: "long",
     }).format(new Date(date));
 
+const formatScheduledDate = (date: string) =>
+    new Intl.DateTimeFormat("ar-EG", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "numeric",
+        minute: "2-digit",
+    }).format(new Date(date));
+
 const getInitials = (name: string) =>
     name
         .trim()
@@ -132,6 +171,20 @@ const getInitials = (name: string) =>
         .slice(0, 2)
         .map((part) => part[0])
         .join("");
+
+const isSendableJobStatus = (status: string) =>
+    status === "in_progress" ||
+    status === "completion_requested";
+
+const timeOptions = Array.from(
+    { length: 48 },
+    (_, index) => {
+        const hour = Math.floor(index / 2);
+        const minute = index % 2 === 0 ? "00" : "30";
+
+        return `${String(hour).padStart(2, "0")}:${minute}`;
+    },
+);
 
 export default function ChatConversation({
     chat,
@@ -144,7 +197,8 @@ export default function ChatConversation({
     const [messages, setMessages] =
         useState<Message[]>(initialMessages);
 
-    const [message, setMessage] = useState("");
+    const [message, setMessage] =
+        useState("");
 
     const [isSending, setIsSending] =
         useState(false);
@@ -152,8 +206,43 @@ export default function ChatConversation({
     const [sendError, setSendError] =
         useState<string | null>(null);
 
-    const [canSend, setCanSend] =
-        useState(initialCanSend);
+    const [jobStatus, setJobStatus] =
+        useState(job.status);
+
+    const [agreedScheduledAt, setAgreedScheduledAt] =
+        useState<string | null>(
+            job.agreed_scheduled_at,
+        );
+
+    const [selectedDate, setSelectedDate] =
+        useState<Date | undefined>(
+            job.agreed_scheduled_at
+                ? new Date(
+                      job.agreed_scheduled_at,
+                  )
+                : undefined,
+        );
+
+    const [selectedTime, setSelectedTime] =
+        useState(
+            job.agreed_scheduled_at
+                ? format(
+                      new Date(
+                          job.agreed_scheduled_at,
+                      ),
+                      "HH:mm",
+                  )
+                : "",
+        );
+
+    const [isScheduling, setIsScheduling] =
+        useState(false);
+
+    const [scheduleError, setScheduleError] =
+        useState<string | null>(null);
+
+    const [scheduleOpen, setScheduleOpen] =
+        useState(false);
 
     const bottomRef =
         useRef<HTMLDivElement | null>(null);
@@ -165,11 +254,28 @@ export default function ChatConversation({
         createClient(),
     );
 
+    const canSend =
+        isSendableJobStatus(jobStatus) &&
+        initialCanSend;
+
     const status =
-        statusConfig[job.status] ?? null;
+        statusConfig[jobStatus] ?? null;
 
     const isOwn = (senderId: string) =>
         senderId === currentUserId;
+
+    const minimumDate = useMemo(() => {
+        const today = new Date();
+
+        today.setHours(
+            0,
+            0,
+            0,
+            0,
+        );
+
+        return today;
+    }, []);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({
@@ -214,42 +320,66 @@ export default function ChatConversation({
                     });
                 },
             )
-            .subscribe();
+            .on(
+                "postgres_changes",
+                {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "jobs",
+                    filter: `id=eq.${job.id}`,
+                },
+                (payload) => {
+                    const updatedJob =
+                        payload.new as RealtimeJob;
+
+                    setJobStatus(
+                        updatedJob.status,
+                    );
+
+                    setAgreedScheduledAt(
+                        updatedJob.agreed_scheduled_at,
+                    );
+
+                    if (
+                        updatedJob.agreed_scheduled_at
+                    ) {
+                        const agreedDate =
+                            new Date(
+                                updatedJob.agreed_scheduled_at,
+                            );
+
+                        setSelectedDate(
+                            agreedDate,
+                        );
+
+                        setSelectedTime(
+                            format(
+                                agreedDate,
+                                "HH:mm",
+                            ),
+                        );
+                    } else {
+                        setSelectedDate(
+                            undefined,
+                        );
+
+                        setSelectedTime("");
+                    }
+                },
+            )
+            .subscribe((subscriptionStatus) => {
+                console.log(
+                    `[Realtime chat:${chat.id}]`,
+                    subscriptionStatus,
+                );
+            });
 
         return () => {
             void supabase.removeChannel(
                 channel,
             );
         };
-    }, [chat.id]);
-
-    useEffect(() => {
-        const handleJobUpdate =
-            async () => {
-                const supabase =
-                    supabaseRef.current;
-
-                const { data } =
-                    await supabase
-                        .from("jobs")
-                        .select("status")
-                        .eq("id", job.id)
-                        .single();
-
-                if (!data) {
-                    return;
-                }
-
-                setCanSend(
-                    data.status ===
-                        "in_progress" ||
-                        data.status ===
-                            "completion_requested",
-                );
-            };
-
-        void handleJobUpdate();
-    }, [job.id]);
+    }, [chat.id, job.id]);
 
     function handleTextareaKeyDown(
         event: React.KeyboardEvent<HTMLTextAreaElement>,
@@ -343,11 +473,98 @@ export default function ChatConversation({
         }
     }
 
+    async function handleSetSchedule() {
+        if (
+            !selectedDate ||
+            !selectedTime ||
+            isScheduling
+        ) {
+            return;
+        }
+
+        try {
+            setIsScheduling(true);
+            setScheduleError(null);
+
+            const [hours, minutes] =
+                selectedTime
+                    .split(":")
+                    .map(Number);
+
+            const scheduledDate =
+                new Date(selectedDate);
+
+            scheduledDate.setHours(
+                hours,
+                minutes,
+                0,
+                0,
+            );
+
+            if (
+                scheduledDate.getTime() <
+                Date.now()
+            ) {
+                setScheduleError(
+                    "اختار وقت في المستقبل.",
+                );
+
+                return;
+            }
+
+            const supabase =
+                supabaseRef.current;
+
+            const {
+                data,
+                error,
+            } = await supabase.rpc(
+                "set_job_agreed_scheduled_at",
+                {
+                    p_job_id: job.id,
+                    p_agreed_scheduled_at:
+                        scheduledDate.toISOString(),
+                },
+            );
+
+            if (error) {
+                throw error;
+            }
+
+            const updatedJob =
+                Array.isArray(data)
+                    ? data[0]
+                    : data;
+
+            if (
+                updatedJob?.agreed_scheduled_at
+            ) {
+                setAgreedScheduledAt(
+                    updatedJob.agreed_scheduled_at,
+                );
+            } else {
+                setAgreedScheduledAt(
+                    scheduledDate.toISOString(),
+                );
+            }
+
+            setScheduleOpen(false);
+        } catch (error) {
+            console.error(
+                "Failed to set agreed schedule:",
+                error,
+            );
+
+            setScheduleError(
+                "حصلت مشكلة أثناء حفظ الموعد. حاول تاني.",
+            );
+        } finally {
+            setIsScheduling(false);
+        }
+    }
+
     return (
-        <div
-            dir="rtl"
-            className="mx-auto flex h-[calc(100dvh-64px)] w-full max-w-[1500px] flex-col px-0 sm:px-4 lg:px-6"
-        >
+        <div className="mx-auto flex h-[calc(100dvh-64px)] max-h-screen w-full max-w-[1500px] flex-col px-0 sm:px-4 lg:px-6">
             <div className="flex min-h-0 flex-1 overflow-hidden border-x bg-background shadow-sm sm:my-4 sm:rounded-xl sm:border">
                 {/* Conversation */}
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -365,11 +582,24 @@ export default function ChatConversation({
                                 </Link>
                             </Button>
 
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                    <h1 className="truncate font-semibold">
-                                        الرسائل
-                                    </h1>
+                            <div className="min-w-0 flex w-full h-full">
+                                <div className="flex h-fit w-fit items-center gap-2">
+                                    <Link href="/chats">
+                                        <h1 className="font-semibold">
+                                            <span className="hidden lg:block">
+                                                الرسائل
+                                            </span>
+
+                                            <span className="text-md lg:hidden">
+                                                <span className="text-sm text-muted-foreground">
+                                                    أ /
+                                                </span>{" "}
+                                                {
+                                                    otherUser.full_name
+                                                }
+                                            </span>
+                                        </h1>
+                                    </Link>
 
                                     <span className="hidden text-muted-foreground sm:inline">
                                         /
@@ -381,22 +611,11 @@ export default function ChatConversation({
                                 </div>
                             </div>
 
-                            <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="hidden gap-2 sm:inline-flex"
-                            >
-                                <Link
-                                    href={`/jobs/${job.id}`}
-                                >
-                                    <BriefcaseBusiness className="size-4" />
-                                    الشغلانة
-                                </Link>
-                            </Button>
-
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                                <DropdownMenuTrigger
+                                    asChild
+                                    className="lg:hidden"
+                                >
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -410,9 +629,7 @@ export default function ChatConversation({
                                     dir="rtl"
                                     className="w-52"
                                 >
-                                    <DropdownMenuItem
-                                        asChild
-                                    >
+                                    <DropdownMenuItem asChild>
                                         <Link
                                             href={`/jobs/${job.id}`}
                                         >
@@ -421,9 +638,7 @@ export default function ChatConversation({
                                         </Link>
                                     </DropdownMenuItem>
 
-                                    <DropdownMenuItem
-                                        asChild
-                                    >
+                                    <DropdownMenuItem asChild>
                                         <Link
                                             href={`/profile/${otherUser.id}`}
                                         >
@@ -434,9 +649,7 @@ export default function ChatConversation({
 
                                     <DropdownMenuSeparator />
 
-                                    <DropdownMenuItem
-                                        asChild
-                                    >
+                                    <DropdownMenuItem asChild>
                                         <Link href="/chats">
                                             <MessageSquare />
                                             كل الرسائل
@@ -447,92 +660,10 @@ export default function ChatConversation({
                         </div>
                     </header>
 
-                    {/* Conversation identity */}
-                    <div className="shrink-0 border-b bg-muted/20">
-                        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4 sm:px-6">
-                            <Avatar className="size-11 shrink-0 border">
-                                <AvatarImage
-                                    src={
-                                        otherUser.avatar_url ??
-                                        undefined
-                                    }
-                                />
-
-                                <AvatarFallback className="text-sm font-semibold">
-                                    {getInitials(
-                                        otherUser.full_name,
-                                    )}
-                                </AvatarFallback>
-                            </Avatar>
-
-                            <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Link
-                                        href={`/profile/${otherUser.id}`}
-                                        className="truncate font-semibold hover:underline"
-                                    >
-                                        {
-                                            otherUser.full_name
-                                        }
-                                    </Link>
-
-                                    {status && (
-                                        <Badge
-                                            variant="outline"
-                                            className={status.className}
-                                        >
-                                            {
-                                                status.label
-                                            }
-                                        </Badge>
-                                    )}
-                                </div>
-
-                                <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                    <Link
-                                        href={`/jobs/${job.id}`}
-                                        className="truncate hover:text-foreground hover:underline"
-                                    >
-                                        {job.title}
-                                    </Link>
-
-                                    <span className="hidden items-center gap-1.5 md:inline-flex">
-                                        <MapPin className="size-3.5" />
-                                        {job.area}
-                                    </span>
-
-                                    <span className="hidden md:inline">
-                                        {Number(
-                                            job.budget,
-                                        ).toLocaleString(
-                                            "ar-EG",
-                                        )}{" "}
-                                        جنيه
-                                    </span>
-                                </div>
-                            </div>
-
-                            <Button
-                                asChild
-                                variant="ghost"
-                                size="sm"
-                                className="hidden gap-1.5 text-muted-foreground lg:inline-flex"
-                            >
-                                <Link
-                                    href={`/profile/${otherUser.id}`}
-                                >
-                                    الملف
-                                    <ChevronLeft className="size-4" />
-                                </Link>
-                            </Button>
-                        </div>
-                    </div>
-
                     {/* Messages */}
                     <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20">
                         <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-3 py-6 sm:px-6">
-                            {messages.length ===
-                            0 ? (
+                            {messages.length === 0 ? (
                                 <div className="flex flex-1 items-center justify-center py-16">
                                     <div className="max-w-md text-center">
                                         <div className="mx-auto flex size-16 items-center justify-center rounded-full border bg-background shadow-sm">
@@ -544,11 +675,12 @@ export default function ChatConversation({
                                         </h2>
 
                                         <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                                            اتفقوا على التفاصيل،
-                                            اسأل عن أي حاجة،
-                                            وخلي كل التواصل
-                                            الخاص بالشغلانة
-                                            هنا.
+                                            اتفقوا على
+                                            التفاصيل،
+                                            اسأل عن أي
+                                            حاجة، وخلي كل
+                                            التواصل الخاص
+                                            بالشغلانة هنا.
                                         </p>
                                     </div>
                                 </div>
@@ -564,7 +696,10 @@ export default function ChatConversation({
                                     </div>
 
                                     {messages.map(
-                                        (item, index) => {
+                                        (
+                                            item,
+                                            index,
+                                        ) => {
                                             const own =
                                                 isOwn(
                                                     item.sender_id,
@@ -572,8 +707,7 @@ export default function ChatConversation({
 
                                             const previous =
                                                 messages[
-                                                    index -
-                                                        1
+                                                    index - 1
                                                 ];
 
                                             const sameSender =
@@ -583,9 +717,7 @@ export default function ChatConversation({
 
                                             return (
                                                 <div
-                                                    key={
-                                                        item.id
-                                                    }
+                                                    key={item.id}
                                                     className={`flex ${
                                                         own
                                                             ? "justify-start"
@@ -638,14 +770,208 @@ export default function ChatConversation({
                                         },
                                     )}
 
-                                    <div
-                                        ref={
-                                            bottomRef
-                                        }
-                                    />
+                                    <div ref={bottomRef} />
                                 </div>
                             )}
                         </div>
+
+                        {/* Schedule agreement */}
+                        {currentUserId ===
+                            chat.clientId &&
+                            isSendableJobStatus(
+                                jobStatus,
+                            ) && (
+                                <div className="mx-auto w-full max-w-3xl px-3 pb-4 sm:px-6">
+                                    <Collapsible
+                                        open={scheduleOpen}
+                                        onOpenChange={
+                                            setScheduleOpen
+                                        }
+                                        className="rounded-lg border bg-card"
+                                    >
+                                        <CollapsibleTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                className="flex h-auto w-full items-center justify-between rounded-lg px-4 py-3 hover:bg-muted/50"
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3 text-right">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-semibold">
+                                                            {agreedScheduledAt
+                                                                ? "الموعد المتفق عليه"
+                                                                : "حدد الموعد المتفق عليه"}
+                                                        </p>
+
+                                                        <p className="text-sm font-normal text-muted-foreground">
+                                                            {agreedScheduledAt
+                                                                ? formatScheduledDate(
+                                                                      agreedScheduledAt,
+                                                                  )
+                                                                : "اختر التاريخ والوقت بعد الاتفاق مع الصنايعي"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <ChevronDown
+                                                    className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+                                                        scheduleOpen
+                                                            ? "rotate-180"
+                                                            : ""
+                                                    }`}
+                                                />
+                                            </Button>
+                                        </CollapsibleTrigger>
+
+                                        <CollapsibleContent className="border-t">
+                                            <div className="grid gap-4 p-4 sm:grid-cols-2">
+                                                {/* Date */}
+                                                <div className="space-y-2">
+                                                    <Label>
+                                                        التاريخ
+                                                    </Label>
+
+                                                    <Popover>
+                                                        <PopoverTrigger
+                                                            asChild
+                                                        >
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                className="w-full justify-between font-normal"
+                                                            >
+                                                                <span className="flex items-center gap-2">
+                                                                    <CalendarDays className="size-4 text-muted-foreground" />
+
+                                                                    {selectedDate ? (
+                                                                        format(
+                                                                            selectedDate,
+                                                                            "PPP",
+                                                                            {
+                                                                                locale: ar,
+                                                                            },
+                                                                        )
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground">
+                                                                            اختر التاريخ
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                            </Button>
+                                                        </PopoverTrigger>
+
+                                                        <PopoverContent
+                                                            className="w-auto p-0"
+                                                            align="start"
+                                                            dir="rtl"
+                                                        >
+                                                            <Calendar
+                                                                mode="single"
+                                                                selected={
+                                                                    selectedDate
+                                                                }
+                                                                onSelect={
+                                                                    setSelectedDate
+                                                                }
+                                                                locale={
+                                                                    ar
+                                                                }
+                                                                disabled={(
+                                                                    date,
+                                                                ) =>
+                                                                    date <
+                                                                    minimumDate
+                                                                }
+                                                                initialFocus
+                                                            />
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+
+                                                {/* Time */}
+                                                <div className="space-y-2">
+                                                    <Label>
+                                                        الوقت
+                                                    </Label>
+
+                                                    <Select
+                                                        value={
+                                                            selectedTime
+                                                        }
+                                                        onValueChange={
+                                                            setSelectedTime
+                                                        }
+                                                    >
+                                                        <SelectTrigger className="w-full">
+                                                            <span className="flex items-center gap-2">
+                                                                <Clock3 className="size-4 text-muted-foreground" />
+
+                                                                <SelectValue placeholder="اختر الوقت" />
+                                                            </span>
+                                                        </SelectTrigger>
+
+                                                        <SelectContent
+                                                            dir="rtl"
+                                                            className="max-h-72"
+                                                        >
+                                                            {timeOptions.map(
+                                                                (
+                                                                    time,
+                                                                ) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            time
+                                                                        }
+                                                                        value={
+                                                                            time
+                                                                        }
+                                                                    >
+                                                                        {time}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                {scheduleError && (
+                                                    <p className="text-sm font-medium text-destructive sm:col-span-2">
+                                                        {
+                                                            scheduleError
+                                                        }
+                                                    </p>
+                                                )}
+
+                                                <Button
+                                                    type="button"
+                                                    className="sm:col-span-2"
+                                                    disabled={
+                                                        !selectedDate ||
+                                                        !selectedTime ||
+                                                        isScheduling
+                                                    }
+                                                    onClick={
+                                                        handleSetSchedule
+                                                    }
+                                                >
+                                                    {isScheduling ? (
+                                                        <>
+                                                            <Loader2 className="size-4 animate-spin" />
+                                                            جاري حفظ الموعد...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CalendarDays className="size-4" />
+                                                            {agreedScheduledAt
+                                                                ? "تعديل الموعد المتفق عليه"
+                                                                : "تأكيد الموعد"}
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                </div>
+                            )}
                     </div>
 
                     {/* Composer */}
@@ -663,7 +989,7 @@ export default function ChatConversation({
                                         </p>
 
                                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                            {job.status ===
+                                            {jobStatus ===
                                             "completed"
                                                 ? "الشغلانة اكتملت، لذلك لم يعد إرسال رسائل جديدة متاحًا."
                                                 : "الشغلانة اتقفلت، لذلك لم يعد إرسال رسائل جديدة متاحًا."}
@@ -707,9 +1033,7 @@ export default function ChatConversation({
                                             }
                                             placeholder="اكتب رسالتك..."
                                             rows={1}
-                                            maxLength={
-                                                5000
-                                            }
+                                            maxLength={5000}
                                             disabled={
                                                 isSending
                                             }
@@ -734,18 +1058,12 @@ export default function ChatConversation({
                                         </Button>
                                     </div>
 
-                                    <div className="mt-2 flex items-center justify-between px-1">
-                                        <p className="text-xs text-muted-foreground">
-                                            Enter للإرسال ·
-                                            Shift + Enter لسطر
-                                            جديد
-                                        </p>
-
-                                        <p className="text-xs tabular-nums text-muted-foreground">
-                                            {message.length.toLocaleString(
-                                                "ar-EG",
-                                            )}
-                                            /٥٠٠٠
+                                    <div className="mt-2 px-1">
+                                        <p className="hidden text-xs text-muted-foreground lg:block">
+                                            Enter
+                                            للإرسال ·
+                                            Shift + Enter
+                                            لسطر جديد
                                         </p>
                                     </div>
                                 </form>
@@ -777,7 +1095,6 @@ export default function ChatConversation({
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-5">
-                            {/* Person */}
                             <div>
                                 <p className="text-xs font-semibold text-muted-foreground">
                                     تتكلم مع
@@ -818,7 +1135,6 @@ export default function ChatConversation({
 
                             <Separator className="my-6" />
 
-                            {/* Job details */}
                             <div className="space-y-5">
                                 <div>
                                     <p className="text-xs text-muted-foreground">
@@ -857,6 +1173,34 @@ export default function ChatConversation({
                                         جنيه
                                     </p>
                                 </div>
+
+                                {job.requested_at && (
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">
+                                            الموعد المطلوب
+                                        </p>
+
+                                        <p className="mt-1 font-medium">
+                                            {formatScheduledDate(
+                                                job.requested_at,
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {agreedScheduledAt && (
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">
+                                            الموعد المتفق عليه
+                                        </p>
+
+                                        <p className="mt-1 font-semibold text-primary">
+                                            {formatScheduledDate(
+                                                agreedScheduledAt,
+                                            )}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <Separator className="my-6" />
