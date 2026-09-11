@@ -4,8 +4,8 @@ import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { UserProvider } from "@/contexts/user-context";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
+const defaultUrl = process.env.APP_URL
+  ? `https://${process.env.APP_URL}`
   : "http://localhost:3000";
 
 // Google Search Console Verification
