@@ -564,10 +564,10 @@ export default function ChatConversation({
     }
 
     return (
-        <div className="mx-auto flex h-[calc(100dvh-64px)] max-h-screen w-full max-w-[1500px] flex-col px-0 sm:px-4 lg:px-6">
-            <div className="flex min-h-0 flex-1 overflow-hidden border-x bg-background shadow-sm sm:my-4 sm:rounded-xl sm:border">
-                {/* Conversation */}
-                <div className="flex min-w-0 flex-1 flex-col">
+        <div className="mx-auto flex h-[calc(100dvh-64px)] max-h-screen w-full flex-col">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+        {/* Conversation */}
+        <div className="flex min-w-0 flex-1 flex-col pt-3 md:pt-5">
                     {/* Top navigation */}
                     <header className="shrink-0 border-b bg-background">
                         <div className="flex h-16 items-center gap-3 px-3 sm:px-5">
@@ -910,14 +910,14 @@ export default function ChatConversation({
                                                         </SelectTrigger>
 
                                                         <SelectContent
-                                                            dir="rtl"
-                                                            className="max-h-72"
+                                                            className="max-h-72 max-w-[80vw]"
                                                         >
                                                             {timeOptions.map(
                                                                 (
                                                                     time,
                                                                 ) => (
                                                                     <SelectItem
+                                                                    // className="text-red-500"
                                                                         key={
                                                                             time
                                                                         }
