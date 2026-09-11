@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     }
 
     return (
-        <div className="p-5 mt-20">
+        <div className="p-5">
             {/* <h1 className="mb-8 text-xl">لوحة التحكم</h1> */}
             {profile.role === "client" ? <ClientDashboardIndex /> : <CraftsmanDashboardIndex />}
         </div>
