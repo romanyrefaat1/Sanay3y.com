@@ -266,7 +266,7 @@ export default function JobDetailsPage({jobId}: {jobId: string}) {
                     href={
                         isOwner
                             ? "/dashboard"
-                            : "/jobs"
+                            : "/craftsman/find"
                     }
                     className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
                 >

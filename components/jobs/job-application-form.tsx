@@ -476,7 +476,7 @@ export default function JobApplicationForm({
 
                         <div>
                             <p className="font-semibold">
-                                قدمت على الشغلانة
+                                انت قدمت على الشغلانة
                             </p>
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">

@@ -9,6 +9,7 @@ import {
     MapPin,
     MessageSquare,
     Phone,
+    Search,
     Star,
     UserRound,
 } from "lucide-react";
@@ -53,7 +54,17 @@ export default function CraftsmanDashboardIndex() {
                     </p>
                 </div>
 
-                <Link href="/craftsman/profile/edit">
+                <div className="flex gap-2">
+                    <Link href="/craftsman/find">
+                    <Button
+                        size="sm"
+                        className="gap-2"
+                    >
+                        <Search className="h-4 w-4" />
+                        دور على شغل
+                    </Button>
+                </Link>
+                 <Link href="/craftsman/profile/edit">
                     <Button
                         variant="outline"
                         size="sm"
@@ -63,6 +74,7 @@ export default function CraftsmanDashboardIndex() {
                         تعديل الملف
                     </Button>
                 </Link>
+                </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
@@ -437,7 +449,6 @@ export default function CraftsmanDashboardIndex() {
                                 <h2 className="font-semibold">
                                     مناطق العمل
                                 </h2>
-
                                 <Link href="/craftsman/profile/edit">
                                     <Button
                                         variant="ghost"
