@@ -96,7 +96,7 @@ function DialogContent({
             <DialogOverlay />
 
             <DialogPrimitive.Content
-                dir="rtl"
+                 
                 data-slot="dialog-content"
                 className={cn(
                     "fixed left-[50%] top-[50%] z-50",

@@ -675,7 +675,7 @@ export default function CraftsmanProfileEditPage() {
     if (isLoading) {
         return (
             <div
-                dir="rtl"
+                 
                 className="mx-auto w-full max-w-3xl px-4 py-6"
             >
                 <p className="text-sm text-muted-foreground">
@@ -692,7 +692,7 @@ export default function CraftsmanProfileEditPage() {
     ) {
         return (
             <div
-                dir="rtl"
+                 
                 className="mx-auto w-full max-w-3xl px-4 py-6"
             >
                 <Card>
@@ -709,7 +709,7 @@ export default function CraftsmanProfileEditPage() {
 
     return (
         <div
-            dir="rtl"
+             
             className="mx-auto w-full max-w-3xl px-4 py-6"
         >
             {/* Header */}
@@ -1489,7 +1489,7 @@ export default function CraftsmanProfileEditPage() {
                     setShowBackDialog
                 }
             >
-                <DialogContent dir="rtl">
+                <DialogContent  >
                     <DialogHeader>
                         <DialogTitle>
                             عايز ترجع لصفحة{" "}

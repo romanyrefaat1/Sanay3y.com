@@ -37,7 +37,7 @@ export default function CraftsmanDashboardIndex() {
 
     return (
         <div
-            dir="rtl"
+             
             className="mx-auto w-full max-w-6xl px-4 py-6"
         >
             {/* Header */}

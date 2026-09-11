@@ -28,8 +28,8 @@ export default async function AppRoutesLayout({
   }
 
   return (
-    <div dir="rtl" className="min-h-screen" style={{ backgroundColor: "hsl(var(--background))" }}>
-      <div className="sticky top-0">
+    <div className="min-h-screen" style={{ backgroundColor: "hsl(var(--background))" }}>
+      <div className="sticky top-0 z-99999999999">
         {role === "craftsman" ? (
         <CraftsmanNavbar />
       ) : role === "client" ? (

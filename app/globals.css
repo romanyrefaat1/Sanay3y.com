@@ -90,7 +90,7 @@
     --chart-4: 199 89% 48%;
     --chart-5: 262 83% 58%;
 
-    --radius: 0.625rem;
+    --radius: 0.1rem;
   }
 
   .dark {
@@ -252,5 +252,35 @@
   select {
     font-family: var(--font-tajawal), sans-serif;
     font-size: 1rem; /* 16px */
+  }
+}
+
+/* =================================
+   STRICT / PROFESSIONAL RADIUS
+   ================================= */
+
+@layer utilities {
+  .rounded-sm {
+    border-radius: 2px;
+  }
+
+  .rounded-md {
+    border-radius: 3px;
+  }
+
+  .rounded-lg {
+    border-radius: 4px;
+  }
+
+  .rounded-xl {
+    border-radius: 5px;
+  }
+
+  .rounded-2xl {
+    border-radius: 6px;
+  }
+
+  .rounded-3xl {
+    border-radius: 8px;
   }
 }

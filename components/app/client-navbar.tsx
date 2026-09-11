@@ -15,7 +15,7 @@ const clientNavItems = [
 { href: "/dashboard", label: "الرئيسية", icon: Home },
 { href: "/client/find", label: "دور على صنايعي", icon: Search },
 { href: "/client/job/new", label: "أضف شغلانة", icon: PlusCircle },
-{ href: "/client/messages", label: "الرسائل", icon: MessageSquare },
+{ href: "/chats", label: "الرسائل", icon: MessageSquare },
 { href: "/profile", label: "حسابي", icon: User },
 ];
 
@@ -25,7 +25,7 @@ const pathname = usePathname();
 return (
 <>
 {/* Desktop top navbar */} <nav
-     dir="rtl"
+      
      className="hidden md:flex items-center h-16 px-6 gap-8 border-b border-primary/20 bg-primary"
    >
 <Link
@@ -80,7 +80,7 @@ style={{ fontFamily: "var(--font-cairo)" }}
 
   {/* Mobile bottom navbar */}
   <nav
-    dir="rtl"
+     
     className="md:hidden fixed bottom-0 inset-x-0 z-50 w-full border-t border-border bg-background"
   >
     <div className="flex w-full min-w-0">

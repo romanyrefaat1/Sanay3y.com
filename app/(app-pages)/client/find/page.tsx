@@ -152,7 +152,6 @@ async function ClientFindContent({
 function Loading() {
     return (
         <div
-            dir="rtl"
             className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
         >
             <div className="space-y-3">
@@ -190,7 +189,6 @@ export default async function ClientFindPage({
     return (
         <Suspense fallback={<Loading />}>
             <main
-                dir="rtl"
                 className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
             >
                 <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">

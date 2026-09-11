@@ -81,7 +81,7 @@ export default function ApplyToJobButton({
             </Button>
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent dir="rtl" className="sm:max-w-lg">
+                <DialogContent   className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>
                             التقديم على الشغلانة

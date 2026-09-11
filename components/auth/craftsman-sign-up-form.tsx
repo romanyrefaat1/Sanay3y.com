@@ -96,7 +96,7 @@ export function CraftsmanSignupForm() {
   }
 
   return (
-    <Card className="border-border/60 shadow-sm" dir="rtl">
+    <Card className="border-border/60 shadow-sm"  >
       <CardHeader>
         <CardTitle className="text-xl">إنشاء حسابك</CardTitle>
       </CardHeader>

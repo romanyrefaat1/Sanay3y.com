@@ -1,573 +1,608 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Loader2,
-  MapPin,
-  MessageSquare,
-  UserRound,
-  XCircle,
+    BadgeCheck,
+    BriefcaseBusiness,
+    Clock3,
+    MapPin,
+    UserRound,
 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+    Card,
+    CardContent,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-type JobApplicationStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "withdrawn";
+import AcceptJobButton from "@/components/jobs/accept-job-button";
+import { Button } from "../ui/button";
 
-type JobApplication = {
-  id: string;
-  job_id: string;
-  craftsman_id: string;
-  proposed_price: number;
-  message: string | null;
-  status: JobApplicationStatus;
-  created_at: string;
-  updated_at: string;
+type JobApplicationsListProps = {
+    jobId: string;
+    isOwner: boolean;
+    jobStatus: string;
 };
 
-type Profile = {
-  id: string;
-  full_name: string;
-  avatar_url: string | null;
-  created_at: string;
+type Application = {
+    id: string;
+    job_id: string;
+    craftsman_id: string;
+    proposed_price: number;
+    message: string;
+    status:
+        | "pending"
+        | "accepted"
+        | "rejected"
+        | "withdrawn"
+        | string;
+    created_at: string;
+    updated_at: string;
 };
 
 type CraftsmanProfile = {
-  id: string;
-  bio: string | null;
-  experience_years: number | null;
-  areas: string[];
-  shop_address: string | null;
-  verification_status:
-    | "pending"
-    | "verified"
-    | "rejected";
-  is_available: boolean;
-  average_response_time_minutes: number | null;
-  response_rate: number;
-  completion_rate: number;
+    id: string;
+    experience_years: number | null;
+    areas: string[];
+    verification_status:
+        | "pending"
+        | "verified"
+        | "rejected"
+        | string;
+    is_available: boolean;
+    response_rate: number;
+    completion_rate: number;
 };
 
-type ApplicationWithCraftsman =
-  JobApplication & {
-    profile: Profile | null;
-    craftsmanProfile:
-      | CraftsmanProfile
-      | null;
-  };
-
-type JobApplicationsListProps = {
-  jobId: string;
+type Profile = {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
 };
 
-function getStatusBadge(
-  status: JobApplicationStatus,
-) {
-  switch (status) {
-    case "accepted":
-      return (
-        <Badge className="gap-1 bg-emerald-100 px-3 py-1 text-emerald-700 hover:bg-emerald-100">
-          <CheckCircle2 className="size-3.5" />
-          تم القبول
-        </Badge>
-      );
+type ApplicationWithCraftsman = Application & {
+    craftsman: Profile | null;
+    craftsmanProfile: CraftsmanProfile | null;
+};
 
-    case "rejected":
-      return (
-        <Badge className="gap-1 bg-red-100 px-3 py-1 text-red-700 hover:bg-red-100">
-          <XCircle className="size-3.5" />
-          مرفوض
-        </Badge>
-      );
-
-    case "withdrawn":
-      return (
-        <Badge className="gap-1 bg-gray-100 px-3 py-1 text-gray-600 hover:bg-gray-100">
-          <XCircle className="size-3.5" />
-          منسحب
-        </Badge>
-      );
-
-    case "pending":
-    default:
-      return (
-        <Badge className="gap-1 bg-amber-100 px-3 py-1 text-amber-700 hover:bg-amber-100">
-          <Clock3 className="size-3.5" />
-          قيد المراجعة
-        </Badge>
-      );
-  }
-}
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat(
-    "ar-EG",
-    {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
+const applicationStatusConfig = {
+    pending: {
+        label: "قيد المراجعة",
+        className:
+            "border-amber-500/20 bg-amber-500/10 text-amber-700",
     },
-  ).format(new Date(date));
-}
 
-function getInitials(name: string) {
-  return (
-    name
-      .trim()
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0])
-      .join("") || "؟"
-  );
-}
+    accepted: {
+        label: "مقبول",
+        className:
+            "border-green-500/20 bg-green-500/10 text-green-700",
+    },
+
+    rejected: {
+        label: "مرفوض",
+        className:
+            "border-destructive/20 bg-destructive/10 text-destructive",
+    },
+
+    withdrawn: {
+        label: "منسحب",
+        className:
+            "border-muted-foreground/20 bg-muted text-muted-foreground",
+    },
+} as const;
+
+const formatDate = (date: string) =>
+    new Intl.DateTimeFormat("ar-EG", {
+        dateStyle: "medium",
+    }).format(new Date(date));
 
 export function JobApplicationsList({
-  jobId,
+    jobId,
+    isOwner,
+    jobStatus,
 }: JobApplicationsListProps) {
-  const supabase = useMemo(
-    () => createClient(),
-    [],
-  );
+    const [applications, setApplications] =
+        useState<ApplicationWithCraftsman[]>([]);
 
-  const [applications, setApplications] =
-    useState<ApplicationWithCraftsman[]>(
-      [],
-    );
+    const [isLoading, setIsLoading] =
+        useState(true);
 
-  const [loading, setLoading] =
-    useState(true);
+    const [error, setError] =
+        useState<string | null>(null);
 
-  const [error, setError] =
-    useState<string | null>(null);
+    useEffect(() => {
+        let mounted = true;
 
-  const loadApplications =
-    useCallback(async () => {
-      setLoading(true);
-      setError(null);
+        async function loadApplications() {
+            try {
+                setIsLoading(true);
+                setError(null);
 
-      try {
-        const {
-          data: applicationData,
-          error: applicationsError,
-        } = await supabase
-          .from("job_applications")
-          .select(
-            `
-              id,
-              job_id,
-              craftsman_id,
-              proposed_price,
-              message,
-              status,
-              created_at,
-              updated_at
-            `,
-          )
-          .eq("job_id", jobId)
-          .order("created_at", {
-            ascending: false,
-          });
+                const supabase = createClient();
 
-        if (applicationsError) {
-          throw applicationsError;
-        }
+                /*
+                 * Get the applications first.
+                 */
+                const {
+                    data: applicationData,
+                    error: applicationsError,
+                } = await supabase
+                    .from("job_applications")
+                    .select(
+                        "id, job_id, craftsman_id, proposed_price, message, status, created_at, updated_at",
+                    )
+                    .eq("job_id", jobId)
+                    .order("created_at", {
+                        ascending: false,
+                    });
 
-        if (
-          !applicationData ||
-          applicationData.length === 0
-        ) {
-          setApplications([]);
-          return;
-        }
-
-        const craftsmanIds = [
-          ...new Set(
-            applicationData.map(
-              (application) =>
-                application.craftsman_id,
-            ),
-          ),
-        ];
-
-        const [
-          {
-            data: profiles,
-            error: profilesError,
-          },
-          {
-            data: craftsmanProfiles,
-            error:
-              craftsmanProfilesError,
-          },
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select(
-              "id, full_name, avatar_url, created_at",
-            )
-            .in("id", craftsmanIds),
-
-          supabase
-            .from("craftsman_profiles")
-            .select(
-              `
-                id,
-                bio,
-                experience_years,
-                areas,
-                shop_address,
-                verification_status,
-                is_available,
-                average_response_time_minutes,
-                response_rate,
-                completion_rate
-              `,
-            )
-            .in("id", craftsmanIds),
-        ]);
-
-        if (profilesError) {
-          throw profilesError;
-        }
-
-        if (
-          craftsmanProfilesError
-        ) {
-          throw craftsmanProfilesError;
-        }
-
-        const profileMap =
-          new Map(
-            (profiles ?? []).map(
-              (profile) => [
-                profile.id,
-                profile,
-              ],
-            ),
-          );
-
-        const craftsmanProfileMap =
-          new Map(
-            (
-              craftsmanProfiles ?? []
-            ).map((profile) => [
-              profile.id,
-              profile,
-            ]),
-          );
-
-        const combined =
-          applicationData.map(
-            (application) => ({
-              ...application,
-              profile:
-                profileMap.get(
-                  application.craftsman_id,
-                ) ?? null,
-              craftsmanProfile:
-                craftsmanProfileMap.get(
-                  application.craftsman_id,
-                ) ?? null,
-            }),
-          );
-
-        setApplications(combined);
-      } catch (err) {
-        console.error(
-          "Failed to load job applications:",
-          err,
-        );
-
-        setError(
-          "حصلت مشكلة أثناء تحميل طلبات التقديم",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }, [jobId, supabase]);
-
-  useEffect(() => {
-    loadApplications();
-  }, [loadApplications]);
-
-  if (loading) {
-    return (
-      <Card dir="rtl">
-        <CardContent className="flex min-h-40 items-center justify-center">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            جاري تحميل المتقدمين...
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card dir="rtl">
-        <CardContent className="flex min-h-40 items-center justify-center text-sm text-red-600">
-          {error}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (applications.length === 0) {
-    return (
-      <Card dir="rtl">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold">
-            المتقدمين
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <div className="flex min-h-32 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-center">
-            <UserRound className="mb-3 size-8 text-muted-foreground" />
-
-            <p className="font-semibold">
-              لسه مفيش متقدمين
-            </p>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              لما الصنايعية يبدأوا يقدموا
-              على الشغلانة هتظهر طلباتهم
-              هنا
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card dir="rtl">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-xl font-bold">
-            المتقدمين
-          </CardTitle>
-
-          <p className="mt-1 text-sm text-muted-foreground">
-            {applications.length}{" "}
-            {applications.length === 1
-              ? "متقدم"
-              : "متقدمين"}{" "}
-            على الشغلانة
-          </p>
-        </div>
-
-        <Badge
-          variant="secondary"
-          className="px-3 py-1"
-        >
-          {applications.length}
-        </Badge>
-      </CardHeader>
-
-      <Separator />
-
-      <CardContent className="space-y-6 mt-8">
-        {applications.map((application, index) => {
-  const profile = application.profile;
-  const craftsmanProfile =
-    application.craftsmanProfile;
-
-  const name =
-    profile?.full_name || "صنايعي";
-
-  const primaryArea =
-    craftsmanProfile?.areas?.[0] || null;
-
-  return (
-    <div key={application.id}>
-      <div className="py-2">
-        {/* Craftsman */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-12 shrink-0 border">
-              <AvatarImage
-                src={
-                  profile?.avatar_url ??
-                  undefined
+                if (applicationsError) {
+                    throw applicationsError;
                 }
-                alt={name}
-              />
 
-              <AvatarFallback className="text-sm font-semibold">
-                {getInitials(name)}
-              </AvatarFallback>
-            </Avatar>
+                if (!mounted) {
+                    return;
+                }
 
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-bold">
-                {name}
-              </h3>
+                if (
+                    !applicationData ||
+                    applicationData.length === 0
+                ) {
+                    setApplications([]);
+                    return;
+                }
 
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {craftsmanProfile?.verification_status ===
-                  "verified" && (
-                  <span className="font-medium text-emerald-600">
-                    حساب موثّق
-                  </span>
-                )}
+                /*
+                 * Get unique craftsman IDs.
+                 */
+                const craftsmanIds = [
+                    ...new Set(
+                        applicationData.map(
+                            (application) =>
+                                application.craftsman_id,
+                        ),
+                    ),
+                ];
 
-                {craftsmanProfile?.experience_years !==
-                  null &&
-                  craftsmanProfile?.experience_years !==
-                    undefined && (
-                    <span>
-                      {
-                        craftsmanProfile.experience_years
-                      }{" "}
-                      {craftsmanProfile.experience_years ===
-                      1
-                        ? "سنة خبرة"
-                        : "سنين خبرة"}
-                    </span>
-                  )}
+                /*
+                 * Basic public profile information.
+                 */
+                const {
+                    data: profileData,
+                    error: profileError,
+                } = await supabase
+                    .from("profiles")
+                    .select(
+                        "id, full_name, avatar_url",
+                    )
+                    .in("id", craftsmanIds);
 
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="size-3.5" />
-                  {formatDate(
-                    application.created_at,
-                  )}
-                </span>
-              </div>
+                if (profileError) {
+                    throw profileError;
+                }
 
-              {/* Important notes */}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {getStatusBadge(
-                  application.status,
-                )}
+                /*
+                 * Craftsman-specific information lives
+                 * in craftsman_profiles, not profiles.
+                 */
+                const {
+                    data: craftsmanProfileData,
+                    error: craftsmanProfileError,
+                } = await supabase
+                    .from("craftsman_profiles")
+                    .select(
+                        [
+                            "id",
+                            "experience_years",
+                            "areas",
+                            "verification_status",
+                            "is_available",
+                            "response_rate",
+                            "completion_rate",
+                        ].join(", "),
+                    )
+                    .in("id", craftsmanIds);
 
-                {primaryArea && (
-                  <Badge
-                    variant="secondary"
-                    className="gap-1 font-normal"
-                  >
-                    <MapPin className="size-3" />
-                    {primaryArea}
-                  </Badge>
-                )}
-              </div>
+                if (craftsmanProfileError) {
+                    throw craftsmanProfileError;
+                }
+
+                const profileMap = new Map<
+                    string,
+                    Profile
+                >(
+                    (profileData ?? []).map(
+                        (profile) => [
+                            profile.id,
+                            profile as Profile,
+                        ],
+                    ),
+                );
+
+                const craftsmanProfileMap =
+                    new Map<
+                        string,
+                        CraftsmanProfile
+                    >(
+                        (craftsmanProfileData ??
+                            []).map(
+                            (profile) => [
+                                profile.id,
+                                profile as CraftsmanProfile,
+                            ],
+                        ),
+                    );
+
+                const combinedApplications =
+                    applicationData.map(
+                        (application) => ({
+                            ...(application as Application),
+
+                            craftsman:
+                                profileMap.get(
+                                    application.craftsman_id,
+                                ) ?? null,
+
+                            craftsmanProfile:
+                                craftsmanProfileMap.get(
+                                    application.craftsman_id,
+                                ) ?? null,
+                        }),
+                    );
+
+                if (mounted) {
+                    setApplications(
+                        combinedApplications,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load job applications:",
+                    error,
+                );
+
+                if (mounted) {
+                    setError(
+                        "لم نتمكن من تحميل التقديمات.",
+                    );
+                }
+            } finally {
+                if (mounted) {
+                    setIsLoading(false);
+                }
+            }
+        }
+
+        void loadApplications();
+
+        return () => {
+            mounted = false;
+        };
+    }, [jobId]);
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardContent className="p-6">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <Clock3 className="size-4 animate-pulse" />
+                        جاري تحميل التقديمات...
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card>
+                <CardContent className="p-6">
+                    <p className="text-sm text-destructive">
+                        {error}
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <section className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold">
+                        المتقدمين
+                    </h2>
+
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {applications.length === 0
+                            ? "لسه مفيش حد قدم على الشغلانة."
+                            : applications.length ===
+                                1
+                              ? "متقدم واحد على الشغلانة"
+                              : `${applications.length} متقدمين على الشغلانة`}
+                    </p>
+                </div>
             </div>
-          </div>
-        </div>
 
-        {/* Application stats */}
-        <div className="mt-6 grid grid-cols-1 overflow-hidden rounded-md bg-muted/50 sm:grid-cols-3">
-          <div className="flex flex-col items-center justify-center border-b p-4 text-center sm:border-b-0 sm:border-l">
-            <p className="text-sm font-medium text-muted-foreground">
-              السعر المقترح
-            </p>
+            {applications.length === 0 ? (
+                <Card>
+                    <CardContent className="p-8 text-center">
+                        <BriefcaseBusiness className="mx-auto size-8 text-muted-foreground" />
 
-            <p className="mt-1 text-lg font-medium">
-              {application.proposed_price.toLocaleString(
-                "ar-EG",
-              )}{" "}
-              جنيه
-            </p>
-          </div>
+                        <p className="mt-3 font-semibold">
+                            مفيش تقديمات لسه
+                        </p>
 
-          <div className="flex flex-col items-center justify-center border-b p-4 text-center sm:border-b-0 sm:border-l">
-            <p className="text-sm font-medium text-muted-foreground">
-              نسبة الرد
-            </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            لما الصنايعية يبدأوا
+                            يقدموا، هتظهر عروضهم هنا.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-4">
+                    {applications.map(
+                        (application) => {
+                            const craftsman =
+                                application.craftsman;
 
-            <p className="mt-1 text-lg font-medium">
-              {craftsmanProfile
-                ? `${craftsmanProfile.response_rate}%`
-                : "غير متاح"}
-            </p>
-          </div>
+                            const craftsmanProfile =
+                                application.craftsmanProfile;
 
-          <div className="flex flex-col items-center justify-center p-4 text-center">
-            <p className="text-sm font-medium text-muted-foreground">
-              نسبة إتمام الأعمال
-            </p>
+                            const applicationStatus =
+                                applicationStatusConfig[
+                                    application.status as keyof typeof applicationStatusConfig
+                                ] ??
+                                applicationStatusConfig.pending;
 
-            <p className="mt-1 text-lg font-medium">
-              {craftsmanProfile
-                ? `${craftsmanProfile.completion_rate}%`
-                : "غير متاح"}
-            </p>
-          </div>
-        </div>
+                            const canAccept =
+                                isOwner &&
+                                jobStatus ===
+                                    "open" &&
+                                application.status ===
+                                    "pending";
 
-        {/* Application message */}
-        {application.message && (
-          <div className="mt-6">
-            <p className="mb-3 text-sm font-medium">
-              الرسالة
-            </p>
+                            return (
+                                <Card
+                                    key={
+                                        application.id
+                                    }
+                                >
+                                    <CardContent className="p-5 sm:p-6">
+                                        {/* Applicant header */}
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
+                                                    {craftsman?.avatar_url ? (
+                                                        <img
+                                                            src={
+                                                                craftsman.avatar_url
+                                                            }
+                                                            alt={
+                                                                craftsman.full_name
+                                                            }
+                                                            className="size-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <UserRound className="size-5 text-muted-foreground" />
+                                                    )}
+                                                </div>
 
-            <p className="whitespace-pre-wrap break-words text-sm leading-8 text-foreground">
-              {application.message}
-            </p>
-          </div>
-        )}
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <Link
+                                                            href={`/profile/${application.craftsman_id}`}
+                                                            className="font-semibold hover:underline"
+                                                        >
+                                                            {craftsman?.full_name ??
+                                                                "صنايعي"}
+                                                        </Link>
 
-        {/* Additional areas */}
-        {craftsmanProfile &&
-          craftsmanProfile.areas.length > 1 && (
-            <div className="mt-6">
-              <p className="mb-2 text-sm font-medium">
-                مناطق العمل
-              </p>
+                                                        {craftsmanProfile?.verification_status ===
+                                                            "verified" && (
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className="gap-1"
+                                                            >
+                                                                <BadgeCheck className="size-3.5" />
+                                                                حساب
+                                                                موثّق
+                                                            </Badge>
+                                                        )}
+                                                    </div>
 
-              <div className="flex flex-wrap gap-2">
-                {craftsmanProfile.areas
-                  .slice(1)
-                  .map((area) => (
-                    <Badge
-                      key={area}
-                      variant="secondary"
-                      className="gap-1 font-normal"
-                    >
-                      <MapPin className="size-3" />
-                      {area}
-                    </Badge>
-                  ))}
-              </div>
-            </div>
-          )}
-      </div>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                                                        {craftsmanProfile?.experience_years !==
+                                                            null &&
+                                                            craftsmanProfile?.experience_years !==
+                                                                undefined && (
+                                                                <span>
+                                                                    {
+                                                                        craftsmanProfile.experience_years
+                                                                    }{" "}
+                                                                    {craftsmanProfile.experience_years ===
+                                                                    1
+                                                                        ? "سنة"
+                                                                        : "سنين"}{" "}
+                                                                    خبرة
+                                                                </span>
+                                                            )}
 
-      {index <
-        applications.length - 1 && (
-        <Separator className="my-7" />
-      )}
-      <Separator />
-    </div>
-  );
-})}
-      </CardContent>
-    </Card>
-  );
+                                                        {craftsmanProfile?.is_available && (
+                                                            <span className="text-green-600">
+                                                                متاح
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <Badge
+                                                variant="outline"
+                                                className={
+                                                    applicationStatus.className
+                                                }
+                                            >
+                                                {
+                                                    applicationStatus.label
+                                                }
+                                            </Badge>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                                            <Clock3 className="size-3.5" />
+
+                                            {formatDate(
+                                                application.created_at,
+                                            )}
+                                        </div>
+
+                                        <Separator className="my-5" />
+
+                                        {/* Offer information */}
+                                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    السعر المقترح
+                                                </p>
+
+                                                <p className="mt-1 text-base font-semibold">
+                                                    {Number(
+                                                        application.proposed_price,
+                                                    ).toLocaleString(
+                                                        "ar-EG",
+                                                    )}{" "}
+                                                    جنيه
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    نسبة الرد
+                                                </p>
+
+                                                <p className="mt-1 text-base font-semibold">
+                                                    {Number(
+                                                        craftsmanProfile?.response_rate ??
+                                                            0,
+                                                    ).toLocaleString(
+                                                        "ar-EG",
+                                                    )}
+                                                    %
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    نسبة إتمام
+                                                    الأعمال
+                                                </p>
+
+                                                <p className="mt-1 text-base font-semibold">
+                                                    {Number(
+                                                        craftsmanProfile?.completion_rate ??
+                                                            0,
+                                                    ).toLocaleString(
+                                                        "ar-EG",
+                                                    )}
+                                                    %
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Message */}
+                                        <div className="mt-5 bg-muted/50 py-5 px-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                الرسالة
+                                            </p>
+
+                                            <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
+                                                {
+                                                    application.message
+                                                }
+                                            </p>
+                                        </div>
+
+                                        {/* Areas */}
+                                        {craftsmanProfile?.areas
+                                            ?.length >
+                                            0 && (
+                                            <div className="mt-5">
+                                                <p className="text-xs text-muted-foreground">
+                                                    مناطق
+                                                    العمل
+                                                </p>
+
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {craftsmanProfile.areas.map(
+                                                        (
+                                                            area,
+                                                        ) => (
+                                                            <Badge
+                                                                key={
+                                                                    area
+                                                                }
+                                                                variant="outline"
+                                                                className="gap-1"
+                                                            >
+                                                                <MapPin className="size-3.5" />
+                                                                {
+                                                                    area
+                                                                }
+                                                            </Badge>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Accept */}
+                                        {canAccept && (
+                                            <div className="mt-6 border-t pt-5">
+                                                <AcceptJobButton
+                                                    jobId={
+                                                        jobId
+                                                    }
+                                                    applicationId={
+                                                        application.id
+                                                    }
+                                                    craftsmanName={
+                                                        craftsman?.full_name ??
+                                                        "الصنايعي"
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Accepted */}
+                                        {application.status ===
+                                            "accepted" && (
+                                            <div>
+                                              <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm font-medium text-green-700">
+                                                <BadgeCheck className="size-4" />
+                                                تم قبول هذا
+                                                الصنايعي
+                                            </div>
+                                              {isOwner && <div className="mt-4">
+                                                    <span>
+                                                      عايز تكلم الصنايعي ده؟
+                                                      {" "}
+                                                      <Link href={`/chats/${jobId}`} className="underline">دوس هنا</Link>
+                                                    </span>
+                                                </div>}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        },
+                    )}
+                </div>
+            )}
+        </section>
+    );
 }
