@@ -16,6 +16,7 @@ const craftsmanNavItems = [
 { href: "/craftsman/find", label: "الشغلانات المتاحة", icon: Search },
 { href: "/craftsman/jobs", label: "شغلي", icon: Briefcase },
 { href: "/chats", label: "الرسائل", icon: MessageSquare },
+{ href: "/craftsman/my-work", label: "شغلي", icon: MessageSquare },
 { href: "/profile", label: "حسابي", icon: User },
 ];
 
