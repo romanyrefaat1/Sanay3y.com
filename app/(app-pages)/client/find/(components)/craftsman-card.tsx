@@ -146,7 +146,7 @@ export default function CraftsmanCard({
                             size="sm"
                             className="shrink-0"
                         >
-                            <Link href={`/profile?id=${craftsman.id}`}>
+                            <Link href={`/profile/${craftsman.id}`}>
                                 عرض الملف الشخصي
                             </Link>
                         </Button>

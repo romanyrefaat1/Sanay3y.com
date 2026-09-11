@@ -167,7 +167,7 @@ export default function ClientDashboardIndex() {
 
                                     <div>
                                         <p className="text-sm font-semibold">
-                                            ابحث عن صنايعي
+                                            دور على صنايعي
                                         </p>
 
                                         <p className="mt-1 text-xs text-muted-foreground">

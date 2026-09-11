@@ -194,11 +194,11 @@ export default async function ClientFindPage({
                 <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
                     <span>لوحة التحكم</span>
                     <span className="text-muted-foreground/50">‹</span>
-                    <span className="text-foreground">ابحث عن صنايعي</span>
+                    <span className="text-foreground">دور على صنايعي</span>
                 </nav>
 
                 <div className="mb-8">
-                    <h1>ابحث عن صنايعي</h1>
+                    <h1>دور على صنايعي</h1>
 
                     <p className="mt-2 text-[15px] text-muted-foreground">
                         لاقي الصنايعي المناسب لشغلك في منطقتك

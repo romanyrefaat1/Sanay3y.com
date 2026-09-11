@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
     ArrowRight,
+    BadgeCheck,
     Check,
     ImagePlus,
     MapPin,
@@ -19,6 +20,8 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -96,12 +99,21 @@ type FieldName =
     | "serviceType"
     | "budget";
 
+type TargetCraftsman = {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    is_active: boolean;
+    verification_status: string;
+    is_available: boolean;
+    work_type: string;
+};
+
 function getFieldError(
     field: FieldName,
     values: JobDraft,
 ) {
-    const result =
-        createJobSchema.safeParse(values);
+    const result = createJobSchema.safeParse(values);
 
     if (result.success) {
         return "";
@@ -114,9 +126,22 @@ function getFieldError(
     );
 }
 
+function getInitials(name: string) {
+    return name
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("");
+}
+
 export default function CreateJobPage() {
     const router = useRouter();
-    const supabase = createClient();
+
+    const supabase = useMemo(
+        () => createClient(),
+        [],
+    );
 
     const {
         user,
@@ -126,35 +151,211 @@ export default function CreateJobPage() {
     } = useUser();
 
     const [title, setTitle] = useState("");
-    const [description, setDescription] =
-        useState("");
-    const [serviceType, setServiceType] =
-        useState("");
+    const [description, setDescription] = useState("");
+    const [serviceType, setServiceType] = useState("");
     const [budget, setBudget] = useState("");
 
-    const [image, setImage] =
-        useState<File | null>(null);
+    const [image, setImage] = useState<File | null>(null);
 
-    const [isSubmitting, setIsSubmitting] =
-        useState(false);
-
-    const [submitError, setSubmitError] =
-        useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     const [touched, setTouched] = useState<
         Partial<Record<FieldName, boolean>>
     >({});
 
-    const [isDraftLoaded, setIsDraftLoaded] =
+    const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+
+    /*
+     * Optional targeted craftsman.
+     *
+     * Example:
+     * /client/job/new?craftsman=USER_UUID
+     */
+    const [craftsmanId, setCraftsmanId] = useState<string | null>(
+        null,
+    );
+
+    const [targetCraftsman, setTargetCraftsman] =
+        useState<TargetCraftsman | null>(null);
+
+    const [isLoadingCraftsman, setIsLoadingCraftsman] =
         useState(false);
+
+    const [craftsmanError, setCraftsmanError] =
+        useState("");
+
+    /*
+     * Read the optional craftsman query parameter.
+     */
+    useEffect(() => {
+        const params = new URLSearchParams(
+            window.location.search,
+        );
+
+        const id = params.get("craftsman")?.trim();
+
+        if (!id) {
+            setCraftsmanId(null);
+            return;
+        }
+
+        setCraftsmanId(id);
+    }, []);
+
+    /*
+     * Resolve and validate the targeted craftsman.
+     */
+    useEffect(() => {
+        if (!craftsmanId) {
+            setTargetCraftsman(null);
+            setCraftsmanError("");
+            setIsLoadingCraftsman(false);
+            return;
+        }
+
+        let isMounted = true;
+
+        const loadCraftsman = async () => {
+            setIsLoadingCraftsman(true);
+            setCraftsmanError("");
+            setTargetCraftsman(null);
+
+            try {
+                /*
+                 * First make sure the ID belongs to an
+                 * active craftsman profile.
+                 */
+                const {
+                    data: profileData,
+                    error: profileError,
+                } = await supabase
+                    .from("profiles")
+                    .select(
+                        `
+                        id,
+                        full_name,
+                        avatar_url,
+                        is_active,
+                        role
+                        `,
+                    )
+                    .eq("id", craftsmanId)
+                    .maybeSingle();
+
+                if (profileError) {
+                    throw profileError;
+                }
+
+                if (!profileData) {
+                    if (isMounted) {
+                        setCraftsmanError(
+                            "الصنايعي المطلوب مش موجود أو الرابط غير صحيح.",
+                        );
+                    }
+
+                    return;
+                }
+
+                if (profileData.role !== "craftsman") {
+                    if (isMounted) {
+                        setCraftsmanError(
+                            "الحساب الموجود في الرابط مش حساب صنايعي.",
+                        );
+                    }
+
+                    return;
+                }
+
+                if (!profileData.is_active) {
+                    if (isMounted) {
+                        setCraftsmanError(
+                            "حساب الصنايعي ده غير متاح حاليًا.",
+                        );
+                    }
+
+                    return;
+                }
+
+                /*
+                 * Make sure the craftsman actually has a
+                 * craftsman_profiles record.
+                 */
+                const {
+                    data: craftsmanData,
+                    error: craftsmanProfileError,
+                } = await supabase
+                    .from("craftsman_profiles")
+                    .select(
+                        `
+                        id,
+                        verification_status,
+                        is_available,
+                        work_type
+                        `,
+                    )
+                    .eq("id", profileData.id)
+                    .maybeSingle();
+
+                if (craftsmanProfileError) {
+                    throw craftsmanProfileError;
+                }
+
+                if (!craftsmanData) {
+                    if (isMounted) {
+                        setCraftsmanError(
+                            "بيانات الصنايعي غير مكتملة حاليًا.",
+                        );
+                    }
+
+                    return;
+                }
+
+                if (isMounted) {
+                    setTargetCraftsman({
+                        id: profileData.id,
+                        full_name: profileData.full_name,
+                        avatar_url: profileData.avatar_url,
+                        is_active: profileData.is_active,
+                        verification_status:
+                            craftsmanData.verification_status,
+                        is_available:
+                            craftsmanData.is_available,
+                        work_type:
+                            craftsmanData.work_type,
+                    });
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load target craftsman:",
+                    error,
+                );
+
+                if (isMounted) {
+                    setCraftsmanError(
+                        "حصل خطأ أثناء تحميل بيانات الصنايعي. تقدر تكمل نشر الشغلانة بشكل عادي.",
+                    );
+                }
+            } finally {
+                if (isMounted) {
+                    setIsLoadingCraftsman(false);
+                }
+            }
+        };
+
+        loadCraftsman();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [craftsmanId, supabase]);
 
     const draftKey = user
         ? `${JOB_DRAFT_PREFIX}:${user.id}`
         : null;
 
     /*
-     * Restore the saved draft once the authenticated
-     * user is available.
+     * Restore saved draft.
      */
     useEffect(() => {
         if (!user || !draftKey) {
@@ -183,9 +384,7 @@ export default function CreateJobPage() {
                 setServiceType(
                     draft.serviceType ?? "",
                 );
-                setBudget(
-                    draft.budget ?? "",
-                );
+                setBudget(draft.budget ?? "");
             }
         } catch (error) {
             console.error(
@@ -204,8 +403,7 @@ export default function CreateJobPage() {
     }, [user, draftKey]);
 
     /*
-     * Save the draft only after the initial draft
-     * has been restored.
+     * Save draft after initial restore.
      */
     useEffect(() => {
         if (!user || !draftKey || !isDraftLoaded) {
@@ -260,17 +458,15 @@ export default function CreateJobPage() {
         values,
     );
 
-    const descriptionError =
-        getFieldError(
-            "description",
-            values,
-        );
+    const descriptionError = getFieldError(
+        "description",
+        values,
+    );
 
-    const serviceTypeError =
-        getFieldError(
-            "serviceType",
-            values,
-        );
+    const serviceTypeError = getFieldError(
+        "serviceType",
+        values,
+    );
 
     const budgetError = getFieldError(
         "budget",
@@ -287,17 +483,31 @@ export default function CreateJobPage() {
         clientProfile?.area?.trim(),
     );
 
+    const isTargetedOffer = Boolean(
+        craftsmanId && targetCraftsman,
+    );
+
+    /*
+     * We only allow submission with a targeted user when
+     * the query parameter has been successfully resolved.
+     *
+     * This prevents accidentally inserting a bad
+     * targeted_at_user value.
+     */
+    const targetIsValid =
+        !craftsmanId || Boolean(targetCraftsman);
+
     const canSubmit =
         hasValidForm &&
         hasArea &&
         Boolean(user) &&
         profile?.role === "client" &&
         Boolean(clientProfile) &&
+        targetIsValid &&
+        !isLoadingCraftsman &&
         !isSubmitting;
 
-    const markTouched = (
-        field: FieldName,
-    ) => {
+    const markTouched = (field: FieldName) => {
         setTouched((current) => ({
             ...current,
             [field]: true,
@@ -315,9 +525,7 @@ export default function CreateJobPage() {
     useEffect(() => {
         return () => {
             if (imagePreview) {
-                URL.revokeObjectURL(
-                    imagePreview,
-                );
+                URL.revokeObjectURL(imagePreview);
             }
         };
     }, [imagePreview]);
@@ -325,8 +533,7 @@ export default function CreateJobPage() {
     const handleImageChange = (
         event: ChangeEvent<HTMLInputElement>,
     ) => {
-        const file =
-            event.target.files?.[0];
+        const file = event.target.files?.[0];
 
         if (!file) {
             return;
@@ -370,21 +577,18 @@ export default function CreateJobPage() {
 
         const filePath = `${user.id}/${fileName}`;
 
-        const {
-            error: uploadError,
-        } = await supabase.storage
-            .from("job-images")
-            .upload(
-                filePath,
-                image,
-                {
-                    cacheControl:
-                        "3600",
-                    upsert: false,
-                    contentType:
-                        image.type,
-                },
-            );
+        const { error: uploadError } =
+            await supabase.storage
+                .from("job-images")
+                .upload(
+                    filePath,
+                    image,
+                    {
+                        cacheControl: "3600",
+                        upsert: false,
+                        contentType: image.type,
+                    },
+                );
 
         if (uploadError) {
             throw uploadError;
@@ -394,9 +598,7 @@ export default function CreateJobPage() {
             data: { publicUrl },
         } = supabase.storage
             .from("job-images")
-            .getPublicUrl(
-                filePath,
-            );
+            .getPublicUrl(filePath);
 
         return publicUrl;
     };
@@ -432,10 +634,6 @@ export default function CreateJobPage() {
             return;
         }
 
-        /*
-         * A client cannot create a Job without
-         * having an area set on their profile.
-         */
         if (!clientProfile.area?.trim()) {
             setSubmitError(
                 "لا يمكنك نشر شغلانة قبل تحديد منطقتك في الملف الشخصي.",
@@ -444,27 +642,32 @@ export default function CreateJobPage() {
         }
 
         /*
+         * If the URL contained a craftsman ID,
+         * require it to resolve successfully.
+         */
+        if (craftsmanId && !targetCraftsman) {
+            setSubmitError(
+                "الصنايعي المطلوب غير متاح. راجع الرابط وحاول مرة أخرى.",
+            );
+            return;
+        }
+
+        /*
          * Final Zod validation.
          */
         const result =
-            createJobSchema.safeParse(
-                values,
-            );
+            createJobSchema.safeParse(values);
 
         if (!result.success) {
             const firstIssue =
                 result.error.issues[0];
 
-            if (
-                firstIssue?.path[0]
-            ) {
-                setTouched(
-                    (current) => ({
-                        ...current,
-                        [firstIssue.path[0] as FieldName]:
-                            true,
-                    }),
-                );
+            if (firstIssue?.path[0]) {
+                setTouched((current) => ({
+                    ...current,
+                    [firstIssue.path[0] as FieldName]:
+                        true,
+                }));
             }
 
             setSubmitError(
@@ -478,40 +681,37 @@ export default function CreateJobPage() {
         try {
             setIsSubmitting(true);
 
-            const imageUrl =
-                await uploadImage();
+            const imageUrl = await uploadImage();
 
+            /*
+             * targeted_at_user:
+             *
+             * Normal job:
+             *   null
+             *
+             * Targeted offer:
+             *   craftsman profile/user ID
+             */
             const {
                 data,
                 error: insertError,
             } = await supabase
                 .from("jobs")
                 .insert({
-                    client_id:
-                        user.id,
-
-                    title:
-                        result.data.title,
-
+                    client_id: user.id,
+                    title: result.data.title,
                     description:
-                        result.data
-                            .description,
-
+                        result.data.description,
                     service_type:
-                        result.data
-                            .serviceType,
-
+                        result.data.serviceType,
                     budget: Number(
                         result.data.budget,
                     ),
-
-                    area:
-                        clientProfile.area.trim(),
-
-                    image_url:
-                        imageUrl,
-
+                    area: clientProfile.area.trim(),
+                    image_url: imageUrl,
                     status: "open",
+                    targeted_at_user:
+                        targetCraftsman?.id ?? null,
                 })
                 .select("id")
                 .single();
@@ -522,18 +722,13 @@ export default function CreateJobPage() {
 
             /*
              * Delete the saved draft only after
-             * the Job was successfully created.
+             * the job was successfully created.
              */
             if (draftKey) {
-                localStorage.removeItem(
-                    draftKey,
-                );
+                localStorage.removeItem(draftKey);
             }
 
-            router.push(
-                `/jobs/${data.id}`,
-            );
-
+            router.push(`/jobs/${data.id}`);
             router.refresh();
         } catch (error) {
             console.error(
@@ -551,10 +746,7 @@ export default function CreateJobPage() {
 
     if (isLoading) {
         return (
-            <div
-                 
-                className="mx-auto w-full max-w-3xl px-4 py-6"
-            >
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 <div className="text-sm text-muted-foreground">
                     جاري تحميل الصفحة...
                 </div>
@@ -563,10 +755,7 @@ export default function CreateJobPage() {
     }
 
     return (
-        <div
-             
-            className="mx-auto w-full max-w-3xl px-4 py-6"
-        >
+        <div className="mx-auto w-full max-w-3xl px-4 py-6">
             {/* Header */}
             <div className="mb-6">
                 <Link
@@ -577,16 +766,160 @@ export default function CreateJobPage() {
                     العودة إلى لوحة التحكم
                 </Link>
 
-                <h1 className="text-2xl font-bold">
-                    انشر شغلانتك
-                </h1>
+                {isTargetedOffer ? (
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 border">
+                            <AvatarImage
+                                src={
+                                    targetCraftsman.avatar_url ??
+                                    undefined
+                                }
+                                alt={
+                                    targetCraftsman.full_name
+                                }
+                            />
 
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    اشرح للصنايعية أنت محتاج إيه
-                    وحدد ميزانيتك عشان تلاقي
-                    الشخص المناسب.
-                </p>
+                            <AvatarFallback>
+                                {getInitials(
+                                    targetCraftsman.full_name,
+                                )}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-2xl font-bold">
+                                    ابعت عرض جديد للصنايعي{" "}
+                                    <Link
+                                        href={`/profile/${targetCraftsman.id}`}
+                                        className="text-primary underline-offset-4 hover:underline"
+                                    >
+                                        {
+                                            targetCraftsman.full_name
+                                        }
+                                    </Link>
+                                </h1>
+
+                                {targetCraftsman.verification_status ===
+                                    "verified" && (
+                                    <Badge className="gap-1 bg-verified text-verified-foreground hover:bg-verified">
+                                        <BadgeCheck className="h-3.5 w-3.5" />
+                                        موثّق
+                                    </Badge>
+                                )}
+                            </div>
+
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                اشرح له تفاصيل الشغلانة
+                                وحدد ميزانيتك عشان
+                                تبعت له عرضك.
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <h1 className="text-2xl font-bold">
+                            انشر شغلانتك
+                        </h1>
+
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                            اشرح للصنايعية أنت محتاج
+                            إيه وحدد ميزانيتك عشان
+                            تلاقي الشخص المناسب.
+                        </p>
+                    </>
+                )}
             </div>
+
+            {/* Invalid / unavailable craftsman */}
+            {craftsmanId &&
+                !isLoadingCraftsman &&
+                craftsmanError && (
+                    <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+                        <p className="text-sm font-medium">
+                            {craftsmanError}
+                        </p>
+
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            تقدر تكمل وتنشر الشغلانة
+                            بشكل عادي، وهتظهر
+                            للصنايعية المناسبين في
+                            منطقتك.
+                        </p>
+                    </div>
+                )}
+
+            {/* Loading target */}
+            {craftsmanId &&
+                isLoadingCraftsman && (
+                    <div className="mb-6 rounded-lg border bg-muted/20 px-4 py-3">
+                        <p className="text-sm text-muted-foreground">
+                            جاري تحميل بيانات الصنايعي...
+                        </p>
+                    </div>
+                )}
+
+            {/* Target craftsman */}
+            {isTargetedOffer && (
+                <Card className="mb-6">
+                    <CardContent className="p-5">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <Avatar className="h-11 w-11 border">
+                                    <AvatarImage
+                                        src={
+                                            targetCraftsman.avatar_url ??
+                                            undefined
+                                        }
+                                        alt={
+                                            targetCraftsman.full_name
+                                        }
+                                    />
+
+                                    <AvatarFallback>
+                                        {getInitials(
+                                            targetCraftsman.full_name,
+                                        )}
+                                    </AvatarFallback>
+                                </Avatar>
+
+                                <div className="min-w-0">
+                                    <p className="text-xs text-muted-foreground">
+                                        العرض هيتبعت إلى
+                                    </p>
+
+                                    <Link
+                                        href={`/profile/${targetCraftsman.id}`}
+                                        className="block truncate font-semibold text-primary underline-offset-4 hover:underline"
+                                    >
+                                        {
+                                            targetCraftsman.full_name
+                                        }
+                                    </Link>
+
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {
+                                            targetCraftsman.work_type
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Badge
+                                className={
+                                    targetCraftsman.is_available
+                                        ? "shrink-0 bg-available text-available-foreground hover:bg-available"
+                                        : "shrink-0 bg-unavailable text-unavailable-foreground hover:bg-unavailable"
+                                }
+                            >
+                                {targetCraftsman.is_available
+                                    ? "متاح"
+                                    : "غير متاح"}
+                            </Badge>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <form
                 onSubmit={handleSubmit}
@@ -597,12 +930,15 @@ export default function CreateJobPage() {
                     <CardContent className="p-6">
                         <div>
                             <h2 className="font-semibold">
-                                تفاصيل الشغلانة
+                                {isTargetedOffer
+                                    ? "تفاصيل العرض"
+                                    : "تفاصيل الشغلانة"}
                             </h2>
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                اكتب التفاصيل بأكبر
-                                قدر ممكن من الوضوح.
+                                {isTargetedOffer
+                                    ? "اكتب تفاصيل الشغلانة بوضوح عشان الصنايعي يعرف المطلوب والميزانية."
+                                    : "اكتب التفاصيل بأكبر قدر ممكن من الوضوح."}
                             </p>
                         </div>
 
@@ -631,8 +967,7 @@ export default function CreateJobPage() {
                                             "title",
                                         );
                                         setTitle(
-                                            event.target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="مثال: إصلاح تسريب في الحنفية"
@@ -647,9 +982,8 @@ export default function CreateJobPage() {
 
                                 {!touched.title && (
                                     <p className="text-xs text-muted-foreground">
-                                        اكتب عنوانًا
-                                        قصيرًا يوضح
-                                        المطلوب.
+                                        اكتب عنوانًا قصيرًا
+                                        يوضح المطلوب.
                                     </p>
                                 )}
 
@@ -681,9 +1015,7 @@ export default function CreateJobPage() {
 
                                 <select
                                     id="serviceType"
-                                    value={
-                                        serviceType
-                                    }
+                                    value={serviceType}
                                     onFocus={() =>
                                         markTouched(
                                             "serviceType",
@@ -694,8 +1026,7 @@ export default function CreateJobPage() {
                                             "serviceType",
                                         );
                                         setServiceType(
-                                            event.target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     aria-invalid={
@@ -711,20 +1042,12 @@ export default function CreateJobPage() {
                                     </option>
 
                                     {serviceTypes.map(
-                                        (
-                                            service,
-                                        ) => (
+                                        (service) => (
                                             <option
-                                                key={
-                                                    service
-                                                }
-                                                value={
-                                                    service
-                                                }
+                                                key={service}
+                                                value={service}
                                             >
-                                                {
-                                                    service
-                                                }
+                                                {service}
                                             </option>
                                         ),
                                     )}
@@ -768,9 +1091,7 @@ export default function CreateJobPage() {
 
                                 <Textarea
                                     id="description"
-                                    value={
-                                        description
-                                    }
+                                    value={description}
                                     onFocus={() =>
                                         markTouched(
                                             "description",
@@ -781,8 +1102,7 @@ export default function CreateJobPage() {
                                             "description",
                                         );
                                         setDescription(
-                                            event.target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="اشرح محتاج يتعمل إيه وأي تفاصيل ممكن تساعد الصنايعي يفهم الشغلانة..."
@@ -827,9 +1147,7 @@ export default function CreateJobPage() {
                                     </div>
 
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                        {
-                                            description.length
-                                        }
+                                        {description.length}
                                         /2000
                                     </span>
                                 </div>
@@ -861,8 +1179,7 @@ export default function CreateJobPage() {
                                                 "budget",
                                             );
                                             setBudget(
-                                                event.target
-                                                    .value,
+                                                event.target.value,
                                             );
                                         }}
                                         placeholder="مثال: 100"
@@ -882,8 +1199,8 @@ export default function CreateJobPage() {
 
                                 {!touched.budget && (
                                     <p className="text-xs text-muted-foreground">
-                                        السعر الذي أنت
-                                        مستعد لدفعه مقابل
+                                        السعر الذي أنت مستعد
+                                        لدفعه مقابل
                                         الشغلانة.
                                     </p>
                                 )}
@@ -928,10 +1245,9 @@ export default function CreateJobPage() {
                                 </div>
 
                                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                    لازم تكون منطقتك محددة
-                                    في ملفك الشخصي عشان
-                                    الصنايعية القريبين منك
-                                    يقدروا يلاقوا الشغلانة.
+                                    منطقتك هتساعد الصنايعي
+                                    يعرف مكان الشغل قبل ما
+                                    يوافق عليه.
                                 </p>
                             </div>
                         </div>
@@ -975,15 +1291,13 @@ export default function CreateJobPage() {
 
                                     <div>
                                         <p className="text-sm font-medium">
-                                            لازم تحدد منطقتك
-                                            أولاً
+                                            لازم تحدد منطقتك أولاً
                                         </p>
 
                                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                            مش هتقدر تنشر
-                                            شغلانة قبل ما
-                                            تضيف منطقتك في
-                                            ملفك الشخصي.
+                                            مش هتقدر تنشر شغلانة
+                                            قبل ما تضيف منطقتك
+                                            في ملفك الشخصي.
                                         </p>
 
                                         <Link
@@ -1024,11 +1338,9 @@ export default function CreateJobPage() {
                                 </div>
 
                                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                    صورة للمكان أو
-                                    المشكلة ممكن
-                                    تساعد الصنايعي
-                                    يفهم الشغلانة
-                                    بشكل أفضل.
+                                    صورة للمكان أو المشكلة
+                                    ممكن تساعد الصنايعي
+                                    يفهم الشغلانة بشكل أفضل.
                                 </p>
                             </div>
                         </div>
@@ -1039,9 +1351,7 @@ export default function CreateJobPage() {
                             <div className="relative overflow-hidden rounded-lg border">
                                 {imagePreview && (
                                     <img
-                                        src={
-                                            imagePreview
-                                        }
+                                        src={imagePreview}
                                         alt="معاينة الصورة"
                                         className="max-h-80 w-full object-cover"
                                     />
@@ -1049,9 +1359,7 @@ export default function CreateJobPage() {
 
                                 <button
                                     type="button"
-                                    onClick={
-                                        removeImage
-                                    }
+                                    onClick={removeImage}
                                     className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border bg-background/90 shadow-sm hover:bg-background"
                                     aria-label="حذف الصورة"
                                 >
@@ -1069,8 +1377,7 @@ export default function CreateJobPage() {
                                 </p>
 
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    PNG أو JPG بحد أقصى
-                                    5 ميجابايت
+                                    PNG أو JPG بحد أقصى 5 ميجابايت
                                 </p>
 
                                 <input
@@ -1098,13 +1405,17 @@ export default function CreateJobPage() {
                     <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="text-sm font-semibold">
-                                جاهز تنشر الشغلانة؟
+                                {isTargetedOffer
+                                    ? `جاهز تبعت عرضك لـ ${targetCraftsman.full_name}؟`
+                                    : "جاهز تنشر الشغلانة؟"}
                             </p>
 
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                                {hasArea
-                                    ? "بعد النشر هتظهر الشغلانة للصنايعية المناسبين في منطقتك."
-                                    : "أضف منطقتك أولاً عشان تقدر تنشر الشغلانة."}
+                                {isTargetedOffer
+                                    ? "راجع تفاصيل الشغلانة والميزانية قبل إرسال العرض."
+                                    : hasArea
+                                      ? "بعد النشر هتظهر الشغلانة للصنايعية المناسبين في منطقتك."
+                                      : "أضف منطقتك أولاً عشان تقدر تنشر الشغلانة."}
                             </p>
                         </div>
 
@@ -1128,8 +1439,10 @@ export default function CreateJobPage() {
                                 className="flex-1 sm:flex-none"
                             >
                                 {isSubmitting
-                                    ? "جاري النشر..."
-                                    : "نشر الشغلانة"}
+                                    ? "جاري الإرسال..."
+                                    : isTargetedOffer
+                                      ? "إرسال العرض"
+                                      : "نشر الشغلانة"}
                             </Button>
                         </div>
                     </CardContent>
