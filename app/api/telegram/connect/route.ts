@@ -29,7 +29,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Authenticate the Sanay3y user
         const supabase = await createClient();
 
         const {
@@ -48,15 +47,53 @@ export async function POST(request: Request) {
 
         const admin = createAdminClient();
 
-        // Remove any previous unused tokens for this user/bot
+        /*
+         * Check whether this user already has an active
+         * Telegram connection for this bot.
+         */
+        const { data: existingConnection, error: connectionError } =
+            await admin
+                .from("telegram_connections")
+                .select("id, telegram_username, telegram_first_name")
+                .eq("user_id", user.id)
+                .eq("bot_type", botType)
+                .eq("is_active", true)
+                .maybeSingle();
+
+        if (connectionError) {
+            console.error(
+                "Failed to check Telegram connection:",
+                connectionError
+            );
+
+            return NextResponse.json(
+                {
+                    error: "Failed to check Telegram connection",
+                },
+                { status: 500 }
+            );
+        }
+
+        if (existingConnection) {
+            return NextResponse.json({
+                success: true,
+                alreadyConnected: true,
+                connection: existingConnection,
+            });
+        }
+
+        /*
+         * Remove any old pending token for this user/bot.
+         */
         await admin
             .from("telegram_link_tokens")
             .delete()
             .eq("user_id", user.id)
             .eq("bot_type", botType);
 
-        // Generate a secure temporary token
-        const token = crypto.randomBytes(24).toString("base64url");
+        const token = crypto
+            .randomBytes(24)
+            .toString("base64url");
 
         const expiresAt = new Date(
             Date.now() + 10 * 60 * 1000
@@ -85,18 +122,23 @@ export async function POST(request: Request) {
             );
         }
 
-        const botUsername = getTelegramBotUsername(botType);
+        const botUsername =
+            getTelegramBotUsername(botType);
 
         const telegramUrl =
             `https://t.me/${botUsername}?start=${token}`;
 
         return NextResponse.json({
             success: true,
+            alreadyConnected: false,
             url: telegramUrl,
             expiresAt,
         });
     } catch (error) {
-        console.error("Telegram connect error:", error);
+        console.error(
+            "Telegram connect error:",
+            error
+        );
 
         return NextResponse.json(
             {

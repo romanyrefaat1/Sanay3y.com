@@ -32,6 +32,8 @@ export default function TelegramConnectionPage() {
     const supabase = createClient();
 
     useEffect(() => {
+        let channel: ReturnType<typeof supabase.channel> | null = null;
+
         async function initialize() {
             try {
                 const {
@@ -51,34 +53,83 @@ export default function TelegramConnectionPage() {
                         .single();
 
                 if (profileError || !profile) {
-                    throw new Error(
-                        "تعذر تحديد نوع الحساب"
-                    );
+                    throw new Error("تعذر تحديد نوع الحساب");
                 }
 
                 if (
                     profile.role !== "client" &&
                     profile.role !== "craftsman"
                 ) {
-                    throw new Error(
-                        "نوع الحساب غير مدعوم"
-                    );
+                    throw new Error("نوع الحساب غير مدعوم");
                 }
 
-                setBotType(profile.role);
+                const currentBotType = profile.role as BotType;
 
-                const { data: connection } =
+                setBotType(currentBotType);
+
+                // Check immediately in case the account is already connected.
+                const { data: connection, error: connectionError } =
                     await supabase
                         .from("telegram_connections")
                         .select("id, is_active")
                         .eq("user_id", user.id)
-                        .eq("bot_type", profile.role)
+                        .eq("bot_type", currentBotType)
                         .eq("is_active", true)
                         .maybeSingle();
 
+                if (connectionError) {
+                    throw connectionError;
+                }
+
                 if (connection) {
                     setConnected(true);
+                    setLoading(false);
+                    return;
                 }
+
+                /*
+                 * Listen for the webhook creating/updating the connection.
+                 *
+                 * This is the important table to listen to.
+                 * telegram_link_tokens is temporary and gets deleted
+                 * by the webhook after a successful connection.
+                 */
+                channel = supabase
+                    .channel(`telegram-connection-${user.id}`)
+                    .on(
+                        "postgres_changes",
+                        {
+                            event: "*",
+                            schema: "public",
+                            table: "telegram_connections",
+                            filter: `user_id=eq.${user.id}`,
+                        },
+                        (payload) => {
+                            const record =
+                                payload.new as {
+                                    user_id?: string;
+                                    bot_type?: BotType;
+                                    is_active?: boolean;
+                                };
+
+                            if (
+                                record.user_id === user.id &&
+                                record.bot_type === currentBotType &&
+                                record.is_active === true
+                            ) {
+                                setConnected(true);
+                                setConnecting(false);
+                            }
+                        }
+                    )
+                    .subscribe((status) => {
+                        console.log(
+                            "Telegram realtime status:",
+                            status
+                        );
+                    });
+
+                setLoading(false);
             } catch (err) {
                 console.error(err);
 
@@ -87,45 +138,19 @@ export default function TelegramConnectionPage() {
                         ? err.message
                         : "حدث خطأ غير متوقع"
                 );
-            } finally {
+
                 setLoading(false);
             }
         }
 
         initialize();
+
+        return () => {
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
+        };
     }, []);
-
-    useEffect(() => {
-        if (!botType || connected) {
-            return;
-        }
-
-        const interval = setInterval(async () => {
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-
-            if (!user) {
-                return;
-            }
-
-            const { data: connection } =
-                await supabase
-                    .from("telegram_connections")
-                    .select("id")
-                    .eq("user_id", user.id)
-                    .eq("bot_type", botType)
-                    .eq("is_active", true)
-                    .maybeSingle();
-
-            if (connection) {
-                setConnected(true);
-                setConnecting(false);
-            }
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [botType, connected]);
 
     const handleConnect = async () => {
         if (!botType) {
@@ -158,8 +183,16 @@ export default function TelegramConnectionPage() {
                 );
             }
 
+            // Already connected.
+            if (data.alreadyConnected) {
+                setConnected(true);
+                setConnecting(false);
+                return;
+            }
+
             setTelegramUrl(data.url);
 
+            // Try opening Telegram automatically.
             window.open(
                 data.url,
                 "_blank",
@@ -252,9 +285,7 @@ export default function TelegramConnectionPage() {
                 <CardContent className="space-y-6">
                     <div className="space-y-3">
                         <div className="flex items-start gap-3">
-                            <div className="mt-0.5">
-                                <ShieldCheck className="h-5 w-5 text-blue-500" />
-                            </div>
+                            <ShieldCheck className="mt-0.5 h-5 w-5 text-blue-500" />
 
                             <div>
                                 <p className="text-sm font-medium">
@@ -269,9 +300,7 @@ export default function TelegramConnectionPage() {
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <div className="mt-0.5">
-                                <Send className="h-5 w-5 text-blue-500" />
-                            </div>
+                            <Send className="mt-0.5 h-5 w-5 text-blue-500" />
 
                             <div>
                                 <p className="text-sm font-medium">
@@ -286,9 +315,7 @@ export default function TelegramConnectionPage() {
                         </div>
 
                         <div className="flex items-start gap-3">
-                            <div className="mt-0.5">
-                                <CheckCircle2 className="h-5 w-5 text-blue-500" />
-                            </div>
+                            <CheckCircle2 className="mt-0.5 h-5 w-5 text-blue-500" />
 
                             <div>
                                 <p className="text-sm font-medium">
@@ -304,10 +331,10 @@ export default function TelegramConnectionPage() {
                     </div>
 
                     {telegramUrl && (
-                        <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
-                            <p className="text-xs text-muted-foreground">
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
+                            <p className="text-center text-xs text-muted-foreground">
                                 لو تيليجرام ما فتحش تلقائيًا،
-                                استخدم الزر مرة تانية.
+                                اضغط الزر مرة تانية.
                             </p>
                         </div>
                     )}
