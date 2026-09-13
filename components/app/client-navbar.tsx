@@ -18,7 +18,7 @@ const clientNavItems = [
   { href: "/client/find", label: "دور على صنايعي", icon: Search },
   { href: "/client/job/new", label: "أضف شغلانة", icon: PlusCircle },
   { href: "/chats", label: "الرسائل", icon: MessageSquare },
-  { href: "/client/job-offers", label: "عروضي", icon: MessageSquare },
+  { href: "/client/my-job-offers", label: "عروضي", icon: MessageSquare },
   { href: "/profile", label: "حسابي", icon: User, isProfile: true },
 ];
 
@@ -26,12 +26,14 @@ export function ClientNavbar() {
   const pathname = usePathname();
   const { profile } = useUser();
 
-  const profileHref = profile?.id ? `/profile/${profile.id}` : "/profile";
+  const profileHref = profile?.id
+    ? `/profile/${profile.id}`
+    : "/profile";
 
   return (
     <>
       {/* Desktop top navbar */}
-      <nav className="hidden md:flex h-16 items-center gap-8 border-b border-primary/20 bg-primary px-6">
+      <nav className="hidden h-16 items-center gap-8 border-b border-primary/20 bg-primary px-6 md:flex">
         <Link
           href="/dashboard"
           className="shrink-0 text-lg font-bold text-primary-foreground"
@@ -46,10 +48,13 @@ export function ClientNavbar() {
           {clientNavItems
             .filter((item) => item.href !== "/client/job/new")
             .map((item) => {
-              const href = item.isProfile ? profileHref : item.href;
+              const href = item.isProfile
+                ? profileHref
+                : item.href;
 
               const active = item.isProfile
-                ? pathname.startsWith("/profile/")
+                ? !!profile?.id &&
+                  pathname === `/profile/${profile.id}`
                 : pathname === item.href;
 
               return (
@@ -63,7 +68,9 @@ export function ClientNavbar() {
                       ? "font-bold text-white"
                       : "font-medium text-white/75 hover:text-white",
                   ].join(" ")}
-                  style={{ fontFamily: "var(--font-cairo)" }}
+                  style={{
+                    fontFamily: "var(--font-cairo)",
+                  }}
                 >
                   {item.label}
 
@@ -92,10 +99,13 @@ export function ClientNavbar() {
       <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-border bg-background md:hidden">
         <div className="flex w-full min-w-0">
           {clientNavItems.map((item) => {
-            const href = item.isProfile ? profileHref : item.href;
+            const href = item.isProfile
+              ? profileHref
+              : item.href;
 
             const active = item.isProfile
-              ? pathname.startsWith("/profile/")
+              ? !!profile?.id &&
+                pathname === `/profile/${profile.id}`
               : pathname === item.href;
 
             return (

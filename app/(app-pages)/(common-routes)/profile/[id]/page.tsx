@@ -1,17 +1,18 @@
 import { notFound } from "next/navigation";
 import {
+    Activity,
     BadgeCheck,
     BriefcaseBusiness,
+    CalendarDays,
     CheckCircle2,
     Clock3,
     MapPin,
-    Phone,
-    Plus,
     Send,
     ShieldCheck,
     Star,
     UserRound,
     Wrench,
+    XCircle,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,12 +35,33 @@ type ProfilePageProps = {
     }>;
 };
 
+type Review = {
+    id: string;
+    work_rating: number | null;
+    respect_rating: number | null;
+    client_experience: string | null;
+    issue_type: string | null;
+    comment: string | null;
+    created_at: string;
+    reviewer: {
+        id: string;
+        full_name: string;
+        avatar_url: string | null;
+    } | null;
+    job: {
+        id: string;
+        title: string;
+    } | null;
+};
+
 const roleLabels = {
     client: "عميل",
     craftsman: "صنايعي",
     admin: "مسؤول",
     team: "فريق صنايعي",
 } as const;
+
+const RATING_JOB_THRESHOLD = 5;
 
 function getInitials(name: string) {
     return name
@@ -92,6 +114,69 @@ function formatResponseTime(minutes: number | null) {
     return `${hours} ساعات تقريبًا`;
 }
 
+function formatReviewDate(date: string) {
+    return new Intl.DateTimeFormat("ar-EG", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+    }).format(new Date(date));
+}
+
+function formatDate(date: string) {
+    return new Intl.DateTimeFormat("ar-EG", {
+        year: "numeric",
+        month: "long",
+    }).format(new Date(date));
+}
+
+function StarRating({
+    rating,
+    size = "h-4 w-4",
+}: {
+    rating: number | null;
+    size?: string;
+}) {
+    if (rating === null) {
+        return (
+            <span className="text-sm text-muted-foreground">
+                غير متوفر
+            </span>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-0.5" dir="ltr">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                    key={star}
+                    className={`${size} ${
+                        star <= rating
+                            ? "fill-warning text-warning"
+                            : "text-muted-foreground/30"
+                    }`}
+                />
+            ))}
+        </div>
+    );
+}
+
+function getIssueTypeLabel(issueType: string) {
+    switch (issueType) {
+        case "late_unavailable":
+            return "تأخير أو عدم التواجد";
+        case "changed_requirements":
+            return "تغيير في المتطلبات";
+        case "communication":
+            return "مشكلة في التواصل";
+        case "payment_issue":
+            return "مشكلة في الدفع";
+        case "other":
+            return "مشكلة أخرى";
+        default:
+            return issueType;
+    }
+}
+
 export default async function ProfilePage({
     params,
 }: ProfilePageProps) {
@@ -107,6 +192,9 @@ export default async function ProfilePage({
         notFound();
     }
 
+    /*
+     * Base profile
+     */
     const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select(
@@ -126,10 +214,18 @@ export default async function ProfilePage({
         notFound();
     }
 
+    const isCraftsman = profile.role === "craftsman";
+    const isClient = profile.role === "client";
+    const isActive = profile.is_active;
+    const isOwnProfile = profile.id === user.id;
+
+    /*
+     * Role-specific profiles
+     */
     let craftsman = null;
     let client = null;
 
-    if (profile.role === "craftsman") {
+    if (isCraftsman) {
         const { data, error } = await supabase
             .from("craftsman_profiles")
             .select(
@@ -159,14 +255,14 @@ export default async function ProfilePage({
         craftsman = data;
     }
 
-    if (profile.role === "client") {
+    if (isClient) {
         const { data, error } = await supabase
             .from("client_profiles")
             .select(
                 `
-                phone,
+                area,
                 gender,
-                area
+                created_at
                 `,
             )
             .eq("id", id)
@@ -179,27 +275,364 @@ export default async function ProfilePage({
         client = data;
     }
 
+    /*
+     * Craftsman data
+     */
+    let craftsmanReviews: Review[] = [];
+    let completedJobs = 0;
+
+    /*
+     * Client data
+     */
+    let clientTotalJobs = 0;
+    let clientCompletedJobs = 0;
+    let clientActiveJobs = 0;
+    let clientRecentJobs: {
+        id: string;
+        title: string;
+        service_type: string;
+        area: string;
+        status: string;
+        created_at: string;
+        selected_craftsman_id: string | null;
+    }[] = [];
+    let clientReviews: Review[] = [];
+
+    /*
+     * ============================================================
+     * CRAFTSMAN DATA
+     * ============================================================
+     */
+    if (isCraftsman) {
+        /*
+         * Only completed jobs where this craftsman was selected
+         * count toward the rating threshold.
+         */
+        const { count: completedJobsCount, error: completedJobsError } =
+            await supabase
+                .from("jobs")
+                .select("id", {
+                    count: "exact",
+                    head: true,
+                })
+                .eq("selected_craftsman_id", id)
+                .eq("status", "completed");
+
+        if (completedJobsError) {
+            notFound();
+        }
+
+        completedJobs = completedJobsCount ?? 0;
+
+        /*
+         * Reviews received by this craftsman.
+         */
+        const { data: reviewRows, error: reviewsError } = await supabase
+            .from("reviews")
+            .select(
+                `
+                id,
+                work_rating,
+                respect_rating,
+                client_experience,
+                issue_type,
+                comment,
+                created_at,
+                reviewer_id,
+                job_id
+                `,
+            )
+            .eq("reviewee_id", id)
+            .eq("reviewee_role", "craftsman")
+            .order("created_at", { ascending: false });
+
+        if (reviewsError) {
+            notFound();
+        }
+
+        const rows = reviewRows ?? [];
+
+        const reviewerIds = [
+            ...new Set(rows.map((review) => review.reviewer_id)),
+        ];
+
+        const jobIds = [
+            ...new Set(rows.map((review) => review.job_id)),
+        ];
+
+        const [{ data: reviewers }, { data: jobs }] = await Promise.all([
+            reviewerIds.length
+                ? supabase
+                      .from("profiles")
+                      .select("id, full_name, avatar_url")
+                      .in("id", reviewerIds)
+                : Promise.resolve({ data: [] }),
+
+            jobIds.length
+                ? supabase
+                      .from("jobs")
+                      .select("id, title")
+                      .in("id", jobIds)
+                : Promise.resolve({ data: [] }),
+        ]);
+
+        const reviewerMap = new Map(
+            (reviewers ?? []).map((reviewer) => [
+                reviewer.id,
+                reviewer,
+            ]),
+        );
+
+        const jobMap = new Map(
+            (jobs ?? []).map((job) => [job.id, job]),
+        );
+
+        craftsmanReviews = rows.map((review) => ({
+            id: review.id,
+            work_rating: review.work_rating,
+            respect_rating: review.respect_rating,
+            client_experience: review.client_experience,
+            issue_type: review.issue_type,
+            comment: review.comment,
+            created_at: review.created_at,
+            reviewer:
+                reviewerMap.get(review.reviewer_id) ?? null,
+            job: jobMap.get(review.job_id) ?? null,
+        }));
+    }
+
+    /*
+     * ============================================================
+     * CLIENT DATA
+     * ============================================================
+     */
+    if (isClient) {
+        const [
+            { count: totalJobs },
+            { count: completedJobsCount },
+            { count: activeJobsCount },
+            { data: recentJobs },
+            { data: reviewRows, error: reviewsError },
+        ] = await Promise.all([
+            supabase
+                .from("jobs")
+                .select("id", {
+                    count: "exact",
+                    head: true,
+                })
+                .eq("client_id", id),
+
+            supabase
+                .from("jobs")
+                .select("id", {
+                    count: "exact",
+                    head: true,
+                })
+                .eq("client_id", id)
+                .eq("status", "completed"),
+
+            supabase
+                .from("jobs")
+                .select("id", {
+                    count: "exact",
+                    head: true,
+                })
+                .eq("client_id", id)
+                .in("status", [
+                    "open",
+                    "in_progress",
+                    "completion_requested",
+                ]),
+
+            supabase
+                .from("jobs")
+                .select(
+                    `
+                    id,
+                    title,
+                    service_type,
+                    area,
+                    status,
+                    created_at,
+                    selected_craftsman_id
+                    `,
+                )
+                .eq("client_id", id)
+                .order("created_at", {
+                    ascending: false,
+                })
+                .limit(5),
+
+            supabase
+                .from("reviews")
+                .select(
+                    `
+                    id,
+                    work_rating,
+                    respect_rating,
+                    client_experience,
+                    issue_type,
+                    comment,
+                    created_at,
+                    reviewer_id,
+                    job_id
+                    `,
+                )
+                .eq("reviewee_id", id)
+                .eq("reviewee_role", "client")
+                .order("created_at", {
+                    ascending: false,
+                }),
+        ]);
+
+        if (reviewsError) {
+            notFound();
+        }
+
+        clientTotalJobs = totalJobs ?? 0;
+        clientCompletedJobs = completedJobsCount ?? 0;
+        clientActiveJobs = activeJobsCount ?? 0;
+        clientRecentJobs = recentJobs ?? [];
+
+        const rows = reviewRows ?? [];
+
+        const reviewerIds = [
+            ...new Set(rows.map((review) => review.reviewer_id)),
+        ];
+
+        const jobIds = [
+            ...new Set(rows.map((review) => review.job_id)),
+        ];
+
+        const [{ data: reviewers }, { data: jobs }] = await Promise.all([
+            reviewerIds.length
+                ? supabase
+                      .from("profiles")
+                      .select("id, full_name, avatar_url")
+                      .in("id", reviewerIds)
+                : Promise.resolve({ data: [] }),
+
+            jobIds.length
+                ? supabase
+                      .from("jobs")
+                      .select("id, title")
+                      .in("id", jobIds)
+                : Promise.resolve({ data: [] }),
+        ]);
+
+        const reviewerMap = new Map(
+            (reviewers ?? []).map((reviewer) => [
+                reviewer.id,
+                reviewer,
+            ]),
+        );
+
+        const jobMap = new Map(
+            (jobs ?? []).map((job) => [job.id, job]),
+        );
+
+        clientReviews = rows.map((review) => ({
+            id: review.id,
+            work_rating: review.work_rating,
+            respect_rating: review.respect_rating,
+            client_experience: review.client_experience,
+            issue_type: review.issue_type,
+            comment: review.comment,
+            created_at: review.created_at,
+            reviewer:
+                reviewerMap.get(review.reviewer_id) ?? null,
+            job: jobMap.get(review.job_id) ?? null,
+        }));
+    }
+
+    /*
+     * ============================================================
+     * RATINGS
+     * ============================================================
+     */
+
+    const activeReviews = isCraftsman
+        ? craftsmanReviews
+        : clientReviews;
+
+    const workRatings = activeReviews
+        .map((review) => review.work_rating)
+        .filter(
+            (rating): rating is number =>
+                typeof rating === "number",
+        );
+
+    const respectRatings = activeReviews
+        .map((review) => review.respect_rating)
+        .filter(
+            (rating): rating is number =>
+                typeof rating === "number",
+        );
+
+    const averageWorkRating =
+        workRatings.length > 0
+            ? workRatings.reduce((sum, rating) => sum + rating, 0) /
+              workRatings.length
+            : null;
+
+    const averageRespectRating =
+        respectRatings.length > 0
+            ? respectRatings.reduce(
+                  (sum, rating) => sum + rating,
+                  0,
+              ) / respectRatings.length
+            : null;
+
+    /*
+     * Craftsman overall rating is intentionally hidden until
+     * the craftsman completes 5 jobs.
+     */
+    const canShowOverallRating =
+        isCraftsman &&
+        completedJobs >= RATING_JOB_THRESHOLD;
+
     const initials = getInitials(profile.full_name);
 
-    const isCraftsman = profile.role === "craftsman";
     const isVerified =
-        isCraftsman && craftsman?.verification_status === "verified";
+        isCraftsman &&
+        craftsman?.verification_status === "verified";
 
     const isAvailable =
-        isCraftsman && craftsman?.is_available === true;
+        isCraftsman &&
+        craftsman?.is_available === true;
+
+    const hasTemporaryLocation =
+        isCraftsman &&
+        !!craftsman?.temporary_area &&
+        !!craftsman?.temporary_location_until &&
+        new Date(craftsman.temporary_location_until) > new Date();
+
+    const clientStatusLabel = {
+        open: "مفتوح",
+        in_progress: "قيد التنفيذ",
+        completion_requested: "في انتظار الإتمام",
+        completed: "مكتمل",
+        cancelled: "ملغي",
+    } as const;
 
     return (
         <main className="min-h-screen bg-background py-8 md:py-10">
             <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-                {/* Profile header */}
+                {/* ======================================================
+                    PROFILE HEADER
+                ======================================================= */}
                 <Card className="overflow-hidden">
                     <CardContent className="p-6 md:p-8">
                         <div className="flex flex-col gap-6 md:flex-row md:items-start">
                             <Avatar className="h-28 w-28 shrink-0 border-4 border-background shadow-sm md:h-32 md:w-32">
                                 <AvatarImage
-                                    src={profile.avatar_url ?? undefined}
+                                    src={
+                                        profile.avatar_url ??
+                                        undefined
+                                    }
                                     alt={profile.full_name}
                                 />
+
                                 <AvatarFallback className="text-2xl font-semibold">
                                     {initials}
                                 </AvatarFallback>
@@ -211,10 +644,16 @@ export default async function ProfilePage({
                                         {profile.full_name}
                                     </h1>
 
-                                    {isVerified && (
+                                    {isCraftsman && isVerified && (
                                         <Badge className="gap-1 bg-verified text-verified-foreground hover:bg-verified">
                                             <BadgeCheck className="h-4 w-4" />
                                             موثّق
+                                        </Badge>
+                                    )}
+
+                                    {!isActive && (
+                                        <Badge variant="secondary">
+                                            الحساب غير نشط
                                         </Badge>
                                     )}
                                 </div>
@@ -234,15 +673,18 @@ export default async function ProfilePage({
                                         </span>
                                     </div>
 
-                                    {isCraftsman && craftsman?.work_type && (
-                                        <>
-                                            <span className="hidden text-border sm:inline">
-                                                |
-                                            </span>
+                                    {isCraftsman &&
+                                        craftsman?.work_type && (
+                                            <>
+                                                <span className="hidden text-border sm:inline">
+                                                    |
+                                                </span>
 
-                                            <span>{craftsman.work_type}</span>
-                                        </>
-                                    )}
+                                                <span>
+                                                    {craftsman.work_type}
+                                                </span>
+                                            </>
+                                        )}
 
                                     {isCraftsman && (
                                         <>
@@ -267,234 +709,938 @@ export default async function ProfilePage({
                                             </div>
                                         </>
                                     )}
+
+                                    {isClient &&
+                                        client?.area && (
+                                            <>
+                                                <span className="hidden text-border sm:inline">
+                                                    |
+                                                </span>
+
+                                                <div className="flex items-center gap-1.5">
+                                                    <MapPin className="h-4 w-4" />
+                                                    <span>
+                                                        {client.area}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
                                 </div>
 
-                                {isCraftsman && craftsman?.areas?.length ? (
+                                {isCraftsman &&
+                                craftsman?.areas?.length ? (
                                     <div className="mt-4 flex flex-wrap gap-2">
-                                        {craftsman.areas.map((area) => (
-                                            <Badge
-                                                key={area}
-                                                variant="secondary"
-                                                className="font-normal"
-                                            >
-                                                <MapPin className="ml-1 h-3.5 w-3.5" />
-                                                {area}
-                                            </Badge>
-                                        ))}
+                                        {craftsman.areas.map(
+                                            (area) => (
+                                                <Badge
+                                                    key={area}
+                                                    variant="secondary"
+                                                    className="font-normal"
+                                                >
+                                                    <MapPin className="ml-1 h-3.5 w-3.5" />
+                                                    {area}
+                                                </Badge>
+                                            ),
+                                        )}
                                     </div>
                                 ) : null}
                             </div>
 
-                            {profile.id !== user.id && (
-                                <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-                                    {isCraftsman && (
-                                        <Link href={`/client/job/new?craftsman=${id}`}>
-                                        <Button className="gap-2">
-                                            <Send className="h-4 w-4" />
-                                         ابعت للصنايعي ده عرض جديد
-                                        </Button>
-
+                            {profile.id !== user.id &&
+                                isCraftsman &&
+                                isActive && (
+                                    <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
+                                        <Link
+                                            href={`/client/job/new?craftsman=${id}`}
+                                        >
+                                            <Button className="gap-2">
+                                                <Send className="h-4 w-4" />
+                                                ابعت للصنايعي ده عرض جديد
+                                            </Button>
                                         </Link>
-                                    )}
-
-                                    {/* <Button
-                                        variant="outline"
-                                        className="gap-2"
-                                    >
-                                        إرسال رسالة
-                                    </Button> */}
-                                </div>
-                            )}
+                                    </div>
+                                )}
                         </div>
                     </CardContent>
                 </Card>
 
                 <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-6">
-                        {/* Craftsman stats */}
+                        {/* ==================================================
+                            CRAFTSMAN
+                        =================================================== */}
+
                         {isCraftsman && craftsman && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>إحصائيات العمل</CardTitle>
-                                </CardHeader>
+                            <>
+                                {/* Overview */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            نظرة عامة
+                                        </CardTitle>
+                                    </CardHeader>
 
-                                <CardContent>
-                                    <div className="grid grid-cols-2 divide-x divide-x-reverse md:grid-cols-4">
-                                        <div className="px-4 text-center first:pr-0 last:pl-0">
-                                            <p className="text-2xl font-bold text-primary">
-                                                {craftsman.response_rate}%
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                معدل الرد
-                                            </p>
-                                        </div>
+                                    <CardContent>
+                                        <div className="grid grid-cols-2 divide-x divide-x-reverse md:grid-cols-5">
+                                            {/* Rating */}
+                                            <div className="px-4 text-center first:pr-0">
+                                                {canShowOverallRating &&
+                                                averageWorkRating !==
+                                                    null ? (
+                                                    <>
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <Star className="h-5 w-5 fill-warning text-warning" />
 
-                                        <div className="px-4 text-center">
-                                            <p className="text-2xl font-bold">
-                                                {craftsman.completion_rate}%
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                معدل إتمام العمل
-                                            </p>
-                                        </div>
+                                                            <span className="text-2xl font-bold">
+                                                                {averageWorkRating.toFixed(
+                                                                    1,
+                                                                )}
+                                                            </span>
+                                                        </div>
 
-                                        <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
-                                            <p className="text-2xl font-bold">
-                                                {formatExperience(
-                                                    craftsman.experience_years,
-                                                )}
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                الخبرة
-                                            </p>
-                                        </div>
-
-                                        <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
-                                            <p className="text-2xl font-bold">
-                                                {formatResponseTime(
-                                                    craftsman.average_response_time_minutes,
-                                                )}
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                متوسط وقت الرد
-                                            </p>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* About */}
-                        {isCraftsman && craftsman?.bio && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>نبذة عني</CardTitle>
-                                </CardHeader>
-
-                                <CardContent>
-                                    <p className="whitespace-pre-line text-muted-foreground">
-                                        {craftsman.bio}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Areas */}
-                        {isCraftsman && craftsman?.areas?.length ? (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>مناطق العمل</CardTitle>
-                                </CardHeader>
-
-                                <CardContent>
-                                    <div className="flex flex-wrap gap-2">
-                                        {craftsman.areas.map((area) => (
-                                            <Badge
-                                                key={area}
-                                                variant="secondary"
-                                                className="px-3 py-1.5 font-normal"
-                                            >
-                                                <MapPin className="ml-1.5 h-4 w-4" />
-                                                {area}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ) : null}
-
-                        {/* Location */}
-                        {isCraftsman && craftsman?.shop_address && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>مكان العمل</CardTitle>
-                                </CardHeader>
-
-                                <CardContent>
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                                            <MapPin className="h-5 w-5" />
-                                        </div>
-
-                                        <div>
-                                            <p className="font-medium">
-                                                عنوان المحل
-                                            </p>
-
-                                            <p className="mt-1 text-muted-foreground">
-                                                {craftsman.shop_address}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {craftsman.temporary_area &&
-                                        craftsman.temporary_location_until && (
-                                            <>
-                                                <Separator className="my-5" />
-
-                                                <div className="flex items-start gap-3">
-                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
-                                                        <MapPin className="h-5 w-5" />
-                                                    </div>
-
-                                                    <div>
-                                                        <p className="font-medium">
-                                                            متواجد مؤقتًا في
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            التقييم
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-sm font-semibold">
+                                                            لم يظهر بعد
                                                         </p>
 
-                                                        <p className="mt-1 text-muted-foreground">
+                                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                                            يظهر بعد إتمام{" "}
                                                             {
-                                                                craftsman.temporary_area
-                                                            }
+                                                                RATING_JOB_THRESHOLD
+                                                            }{" "}
+                                                            أعمال
                                                         </p>
-                                                    </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Completed */}
+                                            <div className="px-4 text-center">
+                                                <p className="text-2xl font-bold">
+                                                    {completedJobs}
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    عمل مكتمل
+                                                </p>
+                                            </div>
+
+                                            {/* Reviews */}
+                                            <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
+                                                <p className="text-2xl font-bold">
+                                                    {
+                                                        craftsmanReviews.length
+                                                    }
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    تقييم
+                                                </p>
+                                            </div>
+
+                                            {/* Completion */}
+                                            <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
+                                                <p className="text-lg font-bold">
+                                                    {
+                                                        craftsman.completion_rate
+                                                    }
+                                                    %
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    معدل الإتمام
+                                                </p>
+                                            </div>
+
+                                            {/* Response */}
+                                            <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
+                                                <p className="text-lg font-bold">
+                                                    {
+                                                        craftsman.response_rate
+                                                    }
+                                                    %
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    معدل الرد
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* About */}
+                                {craftsman.bio && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                نبذة عني
+                                            </CardTitle>
+                                        </CardHeader>
+
+                                        <CardContent>
+                                            <p className="whitespace-pre-line text-muted-foreground">
+                                                {craftsman.bio}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Experience */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            الخبرة
+                                        </CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                                                <BriefcaseBusiness className="h-5 w-5" />
+                                            </div>
+
+                                            <div>
+                                                <p className="font-medium">
+                                                    سنوات الخبرة
+                                                </p>
+
+                                                <p className="mt-1 text-muted-foreground">
+                                                    {formatExperience(
+                                                        craftsman.experience_years,
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Areas */}
+                                {craftsman.areas?.length ? (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                مناطق العمل
+                                            </CardTitle>
+                                        </CardHeader>
+
+                                        <CardContent>
+                                            <div className="flex flex-wrap gap-2">
+                                                {craftsman.areas.map(
+                                                    (area) => (
+                                                        <Badge
+                                                            key={area}
+                                                            variant="secondary"
+                                                            className="px-3 py-1.5 font-normal"
+                                                        >
+                                                            <MapPin className="ml-1.5 h-4 w-4" />
+                                                            {area}
+                                                        </Badge>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : null}
+
+                                {/* Location */}
+                                {craftsman.shop_address && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>
+                                                مكان العمل
+                                            </CardTitle>
+                                        </CardHeader>
+
+                                        <CardContent>
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                                                    <MapPin className="h-5 w-5" />
                                                 </div>
-                                            </>
+
+                                                <div>
+                                                    <p className="font-medium">
+                                                        عنوان المحل
+                                                    </p>
+
+                                                    <p className="mt-1 text-muted-foreground">
+                                                        {
+                                                            craftsman.shop_address
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {hasTemporaryLocation && (
+                                                <>
+                                                    <Separator className="my-5" />
+
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
+                                                            <MapPin className="h-5 w-5" />
+                                                        </div>
+
+                                                        <div>
+                                                            <p className="font-medium">
+                                                                متواجد مؤقتًا في
+                                                            </p>
+
+                                                            <p className="mt-1 text-muted-foreground">
+                                                                {
+                                                                    craftsman.temporary_area
+                                                                }
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Reviews */}
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div>
+                                                <CardTitle>
+                                                    تقييمات العملاء
+                                                </CardTitle>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    آراء العملاء بعد إتمام الأعمال
+                                                </p>
+                                            </div>
+
+                                            {canShowOverallRating &&
+                                                averageWorkRating !==
+                                                    null && (
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        <Star className="h-5 w-5 fill-warning text-warning" />
+
+                                                        <span className="font-semibold">
+                                                            {averageWorkRating.toFixed(
+                                                                1,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        {craftsmanReviews.length === 0 ? (
+                                            <div className="rounded-lg border border-dashed p-8 text-center">
+                                                <Star className="mx-auto h-8 w-8 text-muted-foreground/50" />
+
+                                                <p className="mt-3 font-medium">
+                                                    لا توجد تقييمات بعد
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    ستظهر تقييمات العملاء بعد إتمام الأعمال.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y">
+                                                {craftsmanReviews.map(
+                                                    (review) => (
+                                                        <div
+                                                            key={review.id}
+                                                            className="py-6 first:pt-0 last:pb-0"
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <Avatar className="h-10 w-10 shrink-0">
+                                                                    <AvatarImage
+                                                                        src={
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.avatar_url ??
+                                                                            undefined
+                                                                        }
+                                                                        alt={
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.full_name ??
+                                                                            "العميل"
+                                                                        }
+                                                                    />
+
+                                                                    <AvatarFallback>
+                                                                        {getInitials(
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.full_name ??
+                                                                                "عميل",
+                                                                        )}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                                        <div>
+                                                                            <p className="font-semibold">
+                                                                                {
+                                                                                    review
+                                                                                        .reviewer
+                                                                                        ?.full_name ??
+                                                                                    "عميل"
+                                                                                }
+                                                                            </p>
+
+                                                                            {review.job && (
+                                                                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                                                                    {
+                                                                                        review
+                                                                                            .job
+                                                                                            .title
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            {formatReviewDate(
+                                                                                review.created_at,
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                                                        <div className="rounded-lg bg-muted/40 p-3">
+                                                                            <p className="mb-2 text-sm font-medium">
+                                                                                جودة الشغل
+                                                                            </p>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                <StarRating
+                                                                                    rating={
+                                                                                        review.work_rating
+                                                                                    }
+                                                                                />
+
+                                                                                {review.work_rating !==
+                                                                                    null && (
+                                                                                    <span className="text-sm font-medium">
+                                                                                        {
+                                                                                            review.work_rating
+                                                                                        }
+                                                                                        /5
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="rounded-lg bg-muted/40 p-3">
+                                                                            <p className="mb-2 text-sm font-medium">
+                                                                                الاحترام والتعامل
+                                                                            </p>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                <StarRating
+                                                                                    rating={
+                                                                                        review.respect_rating
+                                                                                    }
+                                                                                />
+
+                                                                                {review.respect_rating !==
+                                                                                    null && (
+                                                                                    <span className="text-sm font-medium">
+                                                                                        {
+                                                                                            review.respect_rating
+                                                                                        }
+                                                                                        /5
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {review.comment && (
+                                                                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                                                                            {
+                                                                                review.comment
+                                                                            }
+                                                                        </p>
+                                                                    )}
+
+                                                                    {review.issue_type && (
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="mt-3 font-normal"
+                                                                        >
+                                                                            {getIssueTypeLabel(
+                                                                                review.issue_type,
+                                                                            )}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
                                         )}
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
+                            </>
                         )}
 
-                        {/* Client information */}
-                        {profile.role === "client" && client && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>معلومات العميل</CardTitle>
-                                </CardHeader>
+                        {/* ==================================================
+                            CLIENT
+                        =================================================== */}
 
-                                <CardContent className="space-y-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                                            <MapPin className="h-5 w-5" />
+                        {isClient && client && (
+                            <>
+                                {/* Client Overview */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Activity className="h-5 w-5 text-primary" />
+                                            نظرة عامة
+                                        </CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                                    <BriefcaseBusiness className="h-4 w-4" />
+
+                                                    <span className="text-sm">
+                                                        الطلبات المنشورة
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-2xl font-bold">
+                                                    {clientTotalJobs}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                                    <CheckCircle2 className="h-4 w-4" />
+
+                                                    <span className="text-sm">
+                                                        أعمال مكتملة
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-2xl font-bold">
+                                                    {clientCompletedJobs}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                                    <Clock3 className="h-4 w-4" />
+
+                                                    <span className="text-sm">
+                                                        طلبات نشطة
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-2xl font-bold">
+                                                    {clientActiveJobs}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                                    <MessageSquareIcon />
+
+                                                    <span className="text-sm">
+                                                        التقييمات
+                                                    </span>
+                                                </div>
+
+                                                <p className="text-2xl font-bold">
+                                                    {
+                                                        clientReviews.length
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Client Information */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            عن العميل
+                                        </CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent className="space-y-5">
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <MapPin className="h-4 w-4" />
+                                                    المنطقة
+                                                </div>
+
+                                                <p className="font-medium">
+                                                    {client.area ||
+                                                        "غير محددة"}
+                                                </p>
+                                            </div>
+
+                                            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                                                <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <UserRound className="h-4 w-4" />
+                                                    النوع
+                                                </div>
+
+                                                <p className="font-medium">
+                                                    {client.gender ===
+                                                    "male"
+                                                        ? "ذكر"
+                                                        : client.gender ===
+                                                            "female"
+                                                          ? "أنثى"
+                                                          : "غير محدد"}
+                                                </p>
+                                            </div>
                                         </div>
 
-                                        <div>
+                                        <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                                            <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                                <CalendarDays className="h-4 w-4" />
+                                                عضو منذ
+                                            </div>
+
                                             <p className="font-medium">
-                                                المنطقة
-                                            </p>
-                                            <p className="text-muted-foreground">
-                                                {client.area}
+                                                {formatDate(
+                                                    profile.created_at,
+                                                )}
                                             </p>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Client Activity */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <BriefcaseBusiness className="h-5 w-5 text-primary" />
+                                            نشاط العميل
+                                        </CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        {clientRecentJobs.length ===
+                                        0 ? (
+                                            <div className="rounded-xl border border-dashed border-border p-8 text-center">
+                                                <BriefcaseBusiness className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+
+                                                <p className="text-sm text-muted-foreground">
+                                                    لا توجد طلبات منشورة حتى الآن
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-border">
+                                                {clientRecentJobs.map(
+                                                    (job) => (
+                                                        <div
+                                                            key={job.id}
+                                                            className="flex flex-col gap-4 py-5 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+                                                        >
+                                                            <div className="min-w-0 space-y-2">
+                                                                <p className="truncate font-medium">
+                                                                    {
+                                                                        job.title
+                                                                    }
+                                                                </p>
+
+                                                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                                    <span>
+                                                                        {
+                                                                            job.service_type
+                                                                        }
+                                                                    </span>
+
+                                                                    <span className="flex items-center gap-1">
+                                                                        <MapPin className="h-3.5 w-3.5" />
+                                                                        {
+                                                                            job.area
+                                                                        }
+                                                                    </span>
+
+                                                                    <span>
+                                                                        {formatDate(
+                                                                            job.created_at,
+                                                                        )}
+                                                                    </span>
+
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="shrink-0"
+                                                                    >
+                                                                        {clientStatusLabel[
+                                                                            job.status as keyof typeof clientStatusLabel
+                                                                        ] ??
+                                                                            job.status}
+                                                                    </Badge>
+                                                                </div>
+                                                            </div>
+
+                                                            <Link
+                                                                href={`/client/jobs/${job.id}`}
+                                                                className="shrink-0"
+                                                            >
+                                                                <Button
+                                                                    variant={
+                                                                        job.status ===
+                                                                        "open"
+                                                                            ? "default"
+                                                                            : "secondary"
+                                                                    }
+                                                                >
+                                                                    شوف الشغلانة
+                                                                </Button>
+                                                            </Link>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Client Reviews */}
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div>
+                                                <CardTitle className="flex items-center gap-2">
+                                                    <Star className="h-5 w-5 text-warning" />
+                                                    تقييمات الصنايعية
+                                                </CardTitle>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    آراء الصنايعية بعد إتمام الأعمال
+                                                </p>
+                                            </div>
+
+                                            <Badge variant="secondary">
+                                                {clientReviews.length} تقييم
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+
+                                    <CardContent>
+                                        {clientReviews.length ===
+                                        0 ? (
+                                            <div className="rounded-lg border border-dashed p-8 text-center">
+                                                <Star className="mx-auto h-8 w-8 text-muted-foreground/50" />
+
+                                                <p className="mt-3 font-medium">
+                                                    لا توجد تقييمات بعد
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    ستظهر تقييمات الصنايعية بعد إتمام الأعمال.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y">
+                                                {clientReviews.map(
+                                                    (review) => (
+                                                        <div
+                                                            key={review.id}
+                                                            className="py-6 first:pt-0 last:pb-0"
+                                                        >
+                                                            <div className="flex items-start gap-3">
+                                                                <Avatar className="h-10 w-10 shrink-0">
+                                                                    <AvatarImage
+                                                                        src={
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.avatar_url ??
+                                                                            undefined
+                                                                        }
+                                                                        alt={
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.full_name ??
+                                                                            "صنايعي"
+                                                                        }
+                                                                    />
+
+                                                                    <AvatarFallback>
+                                                                        {getInitials(
+                                                                            review
+                                                                                .reviewer
+                                                                                ?.full_name ??
+                                                                                "صنايعي",
+                                                                        )}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                                                        <div>
+                                                                            <p className="font-semibold">
+                                                                                {
+                                                                                    review
+                                                                                        .reviewer
+                                                                                        ?.full_name ??
+                                                                                    "صنايعي"
+                                                                                }
+                                                                            </p>
+
+                                                                            {review.job && (
+                                                                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                                                                    عن شغلانة:{" "}
+                                                                                    {
+                                                                                        review
+                                                                                            .job
+                                                                                            .title
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            {formatReviewDate(
+                                                                                review.created_at,
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                                                        <div className="rounded-lg bg-muted/40 p-3">
+                                                                            <p className="mb-2 text-sm font-medium">
+                                                                                جودة التعامل في الشغل
+                                                                            </p>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                <StarRating
+                                                                                    rating={
+                                                                                        review.work_rating
+                                                                                    }
+                                                                                />
+
+                                                                                {review.work_rating !==
+                                                                                    null && (
+                                                                                    <span className="text-sm font-medium">
+                                                                                        {
+                                                                                            review.work_rating
+                                                                                        }
+                                                                                        /5
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="rounded-lg bg-muted/40 p-3">
+                                                                            <p className="mb-2 text-sm font-medium">
+                                                                                الاحترام والتعامل
+                                                                            </p>
+
+                                                                            <div className="flex items-center gap-2">
+                                                                                <StarRating
+                                                                                    rating={
+                                                                                        review.respect_rating
+                                                                                    }
+                                                                                />
+
+                                                                                {review.respect_rating !==
+                                                                                    null && (
+                                                                                    <span className="text-sm font-medium">
+                                                                                        {
+                                                                                            review.respect_rating
+                                                                                        }
+                                                                                        /5
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {review.comment && (
+                                                                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                                                                            {
+                                                                                review.comment
+                                                                            }
+                                                                        </p>
+                                                                    )}
+
+                                                                    {review.issue_type && (
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="mt-3 font-normal"
+                                                                        >
+                                                                            {getIssueTypeLabel(
+                                                                                review.issue_type,
+                                                                            )}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
                         )}
                     </div>
 
-                    {/* Sidebar */}
+                    {/* ======================================================
+                        SIDEBAR
+                    ======================================================= */}
+
                     <aside className="space-y-6">
+                        {/* Craftsman sidebar */}
                         {isCraftsman && craftsman && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>حالة الحساب</CardTitle>
+                                    <CardTitle>
+                                        حالة الحساب
+                                    </CardTitle>
                                 </CardHeader>
 
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
+                                            <UserRound className="h-5 w-5 text-muted-foreground" />
+
+                                            <span>
+                                                حالة الحساب
+                                            </span>
+                                        </div>
+
+                                        <Badge
+                                            className={
+                                                isActive
+                                                    ? "bg-available text-available-foreground hover:bg-available"
+                                                    : "bg-unavailable text-unavailable-foreground hover:bg-unavailable"
+                                            }
+                                        >
+                                            {isActive
+                                                ? "نشط"
+                                                : "غير نشط"}
+                                        </Badge>
+                                    </div>
+
+                                    <Separator />
+
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-2">
                                             <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-                                            <span>التحقق من الهوية</span>
+
+                                            <span>
+                                                التحقق من الهوية
+                                            </span>
                                         </div>
 
                                         {isVerified ? (
@@ -519,7 +1665,10 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <BriefcaseBusiness className="h-5 w-5 text-muted-foreground" />
-                                            <span>حالة العمل</span>
+
+                                            <span>
+                                                حالة العمل
+                                            </span>
                                         </div>
 
                                         <Badge
@@ -540,7 +1689,10 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <Clock3 className="h-5 w-5 text-muted-foreground" />
-                                            <span>سرعة الرد</span>
+
+                                            <span>
+                                                سرعة الرد
+                                            </span>
                                         </div>
 
                                         <span className="text-sm font-medium">
@@ -553,29 +1705,174 @@ export default async function ProfilePage({
                             </Card>
                         )}
 
-                        <Card>
-                            <CardContent className="p-6">
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                                        <Star className="h-5 w-5" />
-                                    </div>
+                        {/* Client sidebar */}
+                        {isClient && client && (
+                            <>
+                                {/* Client Account */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            حالة الحساب
+                                        </CardTitle>
+                                    </CardHeader>
 
-                                    <div>
-                                        <p className="font-semibold">
-                                            التقييمات
-                                        </p>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <UserRound className="h-5 w-5 text-muted-foreground" />
 
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            ستظهر تقييمات العملاء بعد إتمام
-                                            الأعمال.
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                                <span>
+                                                    حالة الحساب
+                                                </span>
+                                            </div>
+
+                                            {isActive ? (
+                                                <Badge className="gap-1 bg-available text-available-foreground hover:bg-available">
+                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                    نشط
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="gap-1 bg-unavailable text-unavailable-foreground hover:bg-unavailable">
+                                                    <XCircle className="h-3.5 w-3.5" />
+                                                    غير نشط
+                                                </Badge>
+                                            )}
+                                        </div>
+
+                                        <Separator />
+
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="h-5 w-5 text-muted-foreground" />
+
+                                                <span>
+                                                    المنطقة
+                                                </span>
+                                            </div>
+
+                                            <span className="text-sm font-medium">
+                                                {client.area ||
+                                                    "غير محددة"}
+                                            </span>
+                                        </div>
+
+                                        <Separator />
+
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-2">
+                                                <CalendarDays className="h-5 w-5 text-muted-foreground" />
+
+                                                <span>
+                                                    عضو منذ
+                                                </span>
+                                            </div>
+
+                                            <span className="text-sm font-medium">
+                                                {formatDate(
+                                                    profile.created_at,
+                                                )}
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Client Reputation */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            التقييم
+                                        </CardTitle>
+                                    </CardHeader>
+
+                                    <CardContent className="space-y-5">
+                                        {clientReviews.length > 0 ? (
+                                            <>
+                                                <div>
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-sm font-medium">
+                                                            جودة التعامل في الشغل
+                                                        </span>
+
+                                                        <span className="text-sm font-semibold">
+                                                            {averageWorkRating !==
+                                                            null
+                                                                ? averageWorkRating.toFixed(
+                                                                      1,
+                                                                  )
+                                                                : "—"}
+                                                        </span>
+                                                    </div>
+
+                                                    <StarRating
+                                                        rating={
+                                                            averageWorkRating
+                                                        }
+                                                    />
+                                                </div>
+
+                                                <Separator />
+
+                                                <div>
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-sm font-medium">
+                                                            الاحترام والتعامل
+                                                        </span>
+
+                                                        <span className="text-sm font-semibold">
+                                                            {averageRespectRating !==
+                                                            null
+                                                                ? averageRespectRating.toFixed(
+                                                                      1,
+                                                                  )
+                                                                : "—"}
+                                                        </span>
+                                                    </div>
+
+                                                    <StarRating
+                                                        rating={
+                                                            averageRespectRating
+                                                        }
+                                                    />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="rounded-lg bg-muted/30 p-4 text-center">
+                                                <Star className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+
+                                                <p className="text-sm font-medium">
+                                                    لم يتم تقييم العميل بعد
+                                                </p>
+
+                                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                                    سيظهر تقييم العميل بعد حصوله
+                                                    على تقييمات من الصنايعية.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </>
+                        )}
                     </aside>
                 </div>
             </div>
         </main>
+    );
+}
+
+function MessageSquareIcon() {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden="true"
+        >
+            <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+        </svg>
     );
 }

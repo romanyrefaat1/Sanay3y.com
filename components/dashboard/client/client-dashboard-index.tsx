@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     BadgeCheck,
@@ -13,23 +14,147 @@ import {
     VenusAndMars,
 } from "lucide-react";
 
+import { createClient } from "@/lib/supabase/client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/contexts/user-context";
 
+type DashboardStats = {
+    totalJobs: number;
+    openJobs: number;
+    inProgress: number;
+    completed: number;
+};
+
+const initialStats: DashboardStats = {
+    totalJobs: 0,
+    openJobs: 0,
+    inProgress: 0,
+    completed: 0,
+};
+
 export default function ClientDashboardIndex() {
     const { profile, clientProfile, isLoading } = useUser();
 
-    const genderText = {
+    const [stats, setStats] =
+        useState<DashboardStats>(initialStats);
+
+    const [statsLoading, setStatsLoading] =
+        useState(true);
+
+    const genderText: Record<string, string> = {
         male: "ذكر",
         female: "أنثى",
     };
 
+    useEffect(() => {
+        if (!profile?.id) {
+            setStatsLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function loadStats() {
+            setStatsLoading(true);
+
+            const supabase = createClient();
+
+            const [
+                totalJobsResult,
+                openJobsResult,
+                inProgressResult,
+                completedResult,
+            ] = await Promise.all([
+                supabase
+                    .from("jobs")
+                    .select("id", {
+                        count: "exact",
+                        head: true,
+                    })
+                    .eq("client_id", profile.id),
+
+                supabase
+                    .from("jobs")
+                    .select("id", {
+                        count: "exact",
+                        head: true,
+                    })
+                    .eq("client_id", profile.id)
+                    .eq("status", "open"),
+
+                supabase
+                    .from("jobs")
+                    .select("id", {
+                        count: "exact",
+                        head: true,
+                    })
+                    .eq("client_id", profile.id)
+                    .eq("status", "in_progress"),
+
+                supabase
+                    .from("jobs")
+                    .select("id", {
+                        count: "exact",
+                        head: true,
+                    })
+                    .eq("client_id", profile.id)
+                    .eq("status", "completed"),
+            ]);
+
+            if (cancelled) return;
+
+            if (totalJobsResult.error) {
+                console.error(
+                    "Failed to load total jobs:",
+                    totalJobsResult.error,
+                );
+            }
+
+            if (openJobsResult.error) {
+                console.error(
+                    "Failed to load open jobs:",
+                    openJobsResult.error,
+                );
+            }
+
+            if (inProgressResult.error) {
+                console.error(
+                    "Failed to load in-progress jobs:",
+                    inProgressResult.error,
+                );
+            }
+
+            if (completedResult.error) {
+                console.error(
+                    "Failed to load completed jobs:",
+                    completedResult.error,
+                );
+            }
+
+            setStats({
+                totalJobs: totalJobsResult.count ?? 0,
+                openJobs: openJobsResult.count ?? 0,
+                inProgress: inProgressResult.count ?? 0,
+                completed: completedResult.count ?? 0,
+            });
+
+            setStatsLoading(false);
+        }
+
+        loadStats();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [profile?.id]);
+
     const onboardingSteps = [
         {
             label: "إضافة صورة شخصية",
-            completed: Boolean(clientProfile?.avatar_url),
+            completed: Boolean(profile?.avatar_url),
         },
         {
             label: "إضافة رقم الهاتف",
@@ -53,15 +178,15 @@ export default function ClientDashboardIndex() {
         (completedSteps / onboardingSteps.length) * 100,
     );
 
+    const editProfileHref =
+        "/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'";
+
     return (
-        <div
-             
-            className="mx-auto w-full max-w-6xl px-4 py-6"
-        >
+        <div className="mx-auto w-full max-w-6xl px-4 py-6">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">
+            <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="truncate text-2xl font-bold">
                         {isLoading
                             ? "..."
                             : `مرحباً ${profile?.full_name || ""}`}
@@ -72,10 +197,7 @@ export default function ClientDashboardIndex() {
                     </p>
                 </div>
 
-                <Link 
-                                    href="/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'"
-
-                >
+                <Link href={editProfileHref}>
                     <Button
                         variant="outline"
                         size="sm"
@@ -95,11 +217,12 @@ export default function ClientDashboardIndex() {
                         <CardContent className="p-5">
                             <div className="flex items-start gap-3">
                                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
-                                    {clientProfile?.avatar_url ? (
+                                    {profile?.avatar_url ? (
                                         <img
-                                            src={clientProfile.avatar_url}
+                                            src={profile.avatar_url}
                                             alt={
-                                                profile?.full_name || ""
+                                                profile?.full_name ||
+                                                "صورة الملف الشخصي"
                                             }
                                             className="h-full w-full object-cover"
                                         />
@@ -128,28 +251,25 @@ export default function ClientDashboardIndex() {
                             <div className="space-y-2 text-sm">
                                 <Link
                                     href="/profile"
-                                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+                                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>الملف العام</span>
-
                                     <UserRound className="h-4 w-4 text-muted-foreground" />
                                 </Link>
 
                                 <Link
-                                    href="/messages"
-                                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+                                    href="/chats"
+                                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>الرسائل</span>
-
                                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
                                 </Link>
 
                                 <Link
                                     href="/client/find"
-                                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+                                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>البحث عن صنايعي</span>
-
                                     <Search className="h-4 w-4 text-muted-foreground" />
                                 </Link>
                             </div>
@@ -157,7 +277,10 @@ export default function ClientDashboardIndex() {
                     </Card>
 
                     {/* Find Craftsman */}
-                    <Link href="/craftsmen" className="block">
+                    <Link
+                        href="/client/find"
+                        className="block"
+                    >
                         <Card className="transition-colors hover:border-primary/40 hover:bg-muted/20">
                             <CardContent className="flex items-center justify-between p-5">
                                 <div className="flex items-center gap-3">
@@ -244,7 +367,7 @@ export default function ClientDashboardIndex() {
                             {completedSteps <
                                 onboardingSteps.length && (
                                 <Link
-                                    href="/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'"
+                                    href={editProfileHref}
                                     className="mt-5 block"
                                 >
                                     <Button
@@ -264,53 +387,33 @@ export default function ClientDashboardIndex() {
                 <div className="space-y-6">
                     {/* Stats */}
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    الطلبات
-                                </p>
+                        <StatCard
+                            label="كل الطلبات"
+                            value={stats.totalJobs}
+                            loading={statsLoading}
+                            href="/client/my-job-offers"
+                        />
 
-                                <p className="mt-2 text-2xl font-bold">
-                                    0
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <StatCard
+                            label="مفتوحة"
+                            value={stats.openJobs}
+                            loading={statsLoading}
+                            href="/client/my-job-offers?status=open"
+                        />
 
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    قيد التنفيذ
-                                </p>
+                        <StatCard
+                            label="قيد التنفيذ"
+                            value={stats.inProgress}
+                            loading={statsLoading}
+                            href="/client/my-job-offers?status=in_progress"
+                        />
 
-                                <p className="mt-2 text-2xl font-bold">
-                                    0
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    مكتملة
-                                </p>
-
-                                <p className="mt-2 text-2xl font-bold">
-                                    0
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">
-                                    المحادثات
-                                </p>
-
-                                <p className="mt-2 text-2xl font-bold">
-                                    0
-                                </p>
-                            </CardContent>
-                        </Card>
+                        <StatCard
+                            label="مكتملة"
+                            value={stats.completed}
+                            loading={statsLoading}
+                            href="/client/my-job-offers?status=completed"
+                        />
                     </div>
 
                     {/* Getting started */}
@@ -323,8 +426,9 @@ export default function ClientDashboardIndex() {
                                     </h2>
 
                                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                        ابحث عن الصنايعية حسب التخصص والمنطقة
-                                        ثم تواصل مع الشخص المناسب لتنفيذ شغلك.
+                                        ابحث عن الصنايعية حسب التخصص
+                                        والمنطقة ثم تواصل مع الشخص المناسب
+                                        لتنفيذ شغلك.
                                     </p>
                                 </div>
 
@@ -347,7 +451,7 @@ export default function ClientDashboardIndex() {
                                 </Link>
 
                                 <Link
-                                    href="/messages"
+                                    href="/chats"
                                     className="w-full sm:w-auto"
                                 >
                                     <Button
@@ -370,10 +474,7 @@ export default function ClientDashboardIndex() {
                                     معلومات الحساب
                                 </h2>
 
-                                <Link 
-                                    href="/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'"
-
-                                >
+                                <Link href={editProfileHref}>
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -388,69 +489,46 @@ export default function ClientDashboardIndex() {
                             <Separator className="my-5" />
 
                             <div className="grid gap-5 md:grid-cols-2">
-                                <div className="flex gap-3">
-                                    <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                <InfoItem
+                                    icon={Phone}
+                                    label="الهاتف"
+                                    value={
+                                        clientProfile?.phone ||
+                                        "غير مضاف"
+                                    }
+                                />
 
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            الهاتف
-                                        </p>
+                                <InfoItem
+                                    icon={MapPin}
+                                    label="المنطقة"
+                                    value={
+                                        clientProfile?.area ||
+                                        "غير مضافة"
+                                    }
+                                />
 
-                                        <p className="mt-1 text-sm font-medium">
-                                            {clientProfile?.phone ||
-                                                "غير مضاف"}
-                                        </p>
-                                    </div>
-                                </div>
+                                <InfoItem
+                                    icon={VenusAndMars}
+                                    label="النوع"
+                                    value={
+                                        clientProfile?.gender
+                                            ? genderText[
+                                                  clientProfile.gender
+                                              ] ||
+                                              clientProfile.gender
+                                            : "غير محدد"
+                                    }
+                                />
 
-                                <div className="flex gap-3">
-                                    <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
-
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            المنطقة
-                                        </p>
-
-                                        <p className="mt-1 text-sm font-medium">
-                                            {clientProfile?.area ||
-                                                "غير مضافة"}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <VenusAndMars className="mt-0.5 h-4 w-4 text-muted-foreground" />
-
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            النوع
-                                        </p>
-
-                                        <p className="mt-1 text-sm font-medium">
-                                            {clientProfile?.gender
-                                                ? genderText[
-                                                      clientProfile.gender
-                                                  ]
-                                                : "غير محدد"}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <BadgeCheck className="mt-0.5 h-4 w-4 text-muted-foreground" />
-
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            حالة الحساب
-                                        </p>
-
-                                        <p className="mt-1 text-sm font-medium">
-                                            {profile?.is_active
-                                                ? "الحساب نشط"
-                                                : "الحساب غير نشط"}
-                                        </p>
-                                    </div>
-                                </div>
+                                <InfoItem
+                                    icon={BadgeCheck}
+                                    label="حالة الحساب"
+                                    value={
+                                        profile?.is_active
+                                            ? "الحساب نشط"
+                                            : "الحساب غير نشط"
+                                    }
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -458,22 +536,19 @@ export default function ClientDashboardIndex() {
                     {/* Location */}
                     <Card>
                         <CardContent className="p-6">
-                            <div className="mb-4 flex items-center justify-between">
+                            <div className="mb-4 flex items-center justify-between gap-4">
                                 <div>
                                     <h2 className="font-semibold">
                                         منطقتك
                                     </h2>
 
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        سنستخدم منطقتك لمساعدتك في العثور على
-                                        صنايعية قريبين منك
+                                        سنستخدم منطقتك لمساعدتك في العثور
+                                        على صنايعية قريبين منك
                                     </p>
                                 </div>
 
-                                <Link 
-                                    href="/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'"
-
-                                >
+                                <Link href={editProfileHref}>
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -519,23 +594,95 @@ export default function ClientDashboardIndex() {
                                     آخر النشاط
                                 </h2>
 
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    لا توجد أنشطة جديدة حالياً.
-                                </p>
+                                {stats.totalJobs > 0 ? (
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        لديك {stats.totalJobs}{" "}
+                                        {stats.totalJobs === 1
+                                            ? "طلب"
+                                            : "طلبات"}{" "}
+                                        في حسابك.
+                                    </p>
+                                ) : (
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        لم تنشر أي طلبات حتى الآن.
+                                    </p>
+                                )}
                             </div>
 
-                            <Link href="/messages">
+                            <Link href="/client/my-job-offers">
                                 <Button
                                     variant="outline"
                                     className="gap-2"
                                 >
-                                    <MessageSquare className="h-4 w-4" />
-                                    الرسائل
+                                    <Search className="h-4 w-4" />
+                                    طلباتي
                                 </Button>
                             </Link>
                         </CardContent>
                     </Card>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function StatCard({
+    label,
+    value,
+    loading,
+    href,
+}: {
+    label: string;
+    value: number;
+    loading: boolean;
+    href: string;
+}) {
+    return (
+        <Link href={href} className="block">
+            <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/20">
+                <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground">
+                        {label}
+                    </p>
+
+                    {loading ? (
+                        <div className="mt-3 h-8 w-10 animate-pulse rounded-md bg-muted" />
+                    ) : (
+                        <p className="mt-2 text-2xl font-bold">
+                            {value}
+                        </p>
+                    )}
+
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        عرض الطلبات
+                    </p>
+                </CardContent>
+            </Card>
+        </Link>
+    );
+}
+
+function InfoItem({
+    icon: Icon,
+    label,
+    value,
+}: {
+    icon: typeof Phone;
+    label: string;
+    value: string;
+}) {
+    return (
+        <div className="flex gap-3">
+            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+
+            <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">
+                    {label}
+                </p>
+
+                <p className="mt-1 break-words text-sm font-medium">
+                    {value}
+                </p>
             </div>
         </div>
     );

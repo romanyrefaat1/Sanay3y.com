@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 
 import JobApplicationForm from "@/components/jobs/job-application-form";
 import { JobApplicationsList } from "@/components/jobs/job-applications-list";
+import { FinishJobButton } from "@/components/jobs/finish-job-button";
 
 type PageProps = {
     params: Promise<{
@@ -41,11 +42,6 @@ const statusConfig = {
         label: "قيد التنفيذ",
         className:
             "border-blue-500/20 bg-blue-500/10 text-blue-600",
-    },
-    completion_requested: {
-        label: "في انتظار تأكيد الإكمال",
-        className:
-            "border-amber-500/20 bg-amber-500/10 text-amber-600",
     },
     completed: {
         label: "مكتملة",
@@ -120,6 +116,9 @@ export default async function JobDetailsPage({
 
     const isOwner = user?.id === job.client_id;
 
+    const isSelectedCraftsman =
+        user?.id === job.selected_craftsman_id;
+
     const status =
         statusConfig[
             job.status as keyof typeof statusConfig
@@ -128,11 +127,16 @@ export default async function JobDetailsPage({
     const canApply =
         !!user &&
         !isOwner &&
+        !isSelectedCraftsman &&
         job.status === "open";
 
     const messagesClosed =
         job.status === "completed" ||
         job.status === "cancelled";
+
+    const canFinish =
+        job.status === "in_progress" &&
+        (isOwner || isSelectedCraftsman);
 
     return (
         <div className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -323,6 +327,27 @@ export default async function JobDetailsPage({
                             </CardContent>
                         </Card>
                     )}
+
+                    {/* Completion status */}
+                    {job.status === "completed" && (
+                        <Card>
+                            <CardContent className="p-6 sm:p-7">
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-600" />
+
+                                    <div>
+                                        <h2 className="font-semibold">
+                                            تم إنهاء الشغلانة
+                                        </h2>
+
+                                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                            تم تسجيل الشغلانة كمكتملة.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Sidebar */}
@@ -396,14 +421,16 @@ export default async function JobDetailsPage({
                                 </p>
 
                                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                    {job.status ===
-                                    "open"
+                                    {job.status === "open"
                                         ? "تقدر تعدل تفاصيلها أو تختار صنايعي من التقديمات."
-                                        : "تم تحديث حالة الشغلانة ولا يمكن تعديل تفاصيلها الآن."}
+                                        : job.status === "in_progress"
+                                          ? "الشغلانة قيد التنفيذ مع الصنايعي المختار. تقدر تنهيها لما تخلص."
+                                          : job.status === "completed"
+                                            ? "تم إنهاء الشغلانة."
+                                            : "تم تحديث حالة الشغلانة ولا يمكن تعديل تفاصيلها الآن."}
                                 </p>
 
-                                {job.status ===
-                                    "open" && (
+                                {job.status === "open" && (
                                     <Link
                                         href={`/jobs/${job.id}/edit`}
                                         className="mt-4 block"
@@ -416,6 +443,42 @@ export default async function JobDetailsPage({
                                             تعديل الشغلانة
                                         </Button>
                                     </Link>
+                                )}
+
+                                {canFinish &&
+                                    isOwner && (
+                                        <div className="mt-4">
+                                            <FinishJobButton
+                                                jobId={job.id}
+                                            />
+                                        </div>
+                                    )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Craftsman actions */}
+                    {isSelectedCraftsman && (
+                        <Card>
+                            <CardContent className="p-5">
+                                <p className="font-semibold">
+                                    الشغلانة دي معاك
+                                </p>
+
+                                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                    {job.status === "in_progress"
+                                        ? "لو خلصت الشغلانة، تقدر تعلمها كمكتملة من هنا."
+                                        : job.status === "completed"
+                                          ? "تم إنهاء الشغلانة."
+                                          : "تم تحديث حالة الشغلانة."}
+                                </p>
+
+                                {canFinish && (
+                                    <div className="mt-4">
+                                        <FinishJobButton
+                                            jobId={job.id}
+                                        />
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
@@ -463,6 +526,7 @@ export default async function JobDetailsPage({
                     jobId={job.id}
                     isOwner={isOwner}
                     jobStatus={job.status}
+                    selectedCraftsmanId={job.selected_craftsman_id}
                 />
             </div>
         </div>

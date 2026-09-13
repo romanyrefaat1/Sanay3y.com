@@ -26,6 +26,7 @@ type JobApplicationsListProps = {
     jobId: string;
     isOwner: boolean;
     jobStatus: string;
+    selectedCraftsmanId: string;
 };
 
 type Application = {
@@ -104,6 +105,7 @@ export function JobApplicationsList({
     jobId,
     isOwner,
     jobStatus,
+    selectedCraftsmanId
 }: JobApplicationsListProps) {
     const [applications, setApplications] =
         useState<ApplicationWithCraftsman[]>([]);
@@ -467,7 +469,7 @@ export function JobApplicationsList({
                                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                                             <div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    السعر المقترح
+                                                    السعر {application.price_type === "fixed" ? "المقترح" : "يبدأ من"}
                                                 </p>
 
                                                 <p className="mt-1 text-base font-semibold">
@@ -478,7 +480,13 @@ export function JobApplicationsList({
                                                     )}{" "}
                                                     جنيه
                                                 </p>
-                                            </div>
+
+                                                    <span className="">
+                                                        {application.price_type === "fixed" ? "هو ده السعر اللي هتحاسب عليه" : "السعر ده هو اقل سعر الصنايعي مستعد ياخده وهيقرر السعر الحقيقي لما يوصل ويعين الحالة"}
+                                    
+                                                    </span>
+
+                                                       </div>
 
                                             <div>
                                                 <p className="text-xs text-muted-foreground">
@@ -587,7 +595,7 @@ export function JobApplicationsList({
                                                 تم قبول هذا
                                                 الصنايعي
                                             </div>
-                                              {isOwner && <div className="mt-4">
+                                              {isOwner && jobStatus === "in_progress" &&application.id === selectedCraftsmanId && <div className="mt-4">
                                                     <span>
                                                       عايز تكلم الصنايعي ده؟
                                                       {" "}

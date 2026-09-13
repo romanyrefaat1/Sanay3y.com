@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
     BadgeCheck,
@@ -18,6 +19,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/contexts/user-context";
+import { createClient } from "@/lib/supabase/client";
+
+type JobStats = {
+    total: number;
+    completed: number;
+};
 
 export default function CraftsmanDashboardIndex() {
     const {
@@ -29,21 +36,90 @@ export default function CraftsmanDashboardIndex() {
         isLoading,
     } = useUser();
 
+    const [jobStats, setJobStats] = useState<JobStats>({
+        total: 0,
+        completed: 0,
+    });
+
+    const [isStatsLoading, setIsStatsLoading] = useState(true);
+
     const verificationText = {
         pending: "قيد التوثيق",
         verified: "حساب موثق",
         rejected: "التوثيق مرفوض",
     };
 
+    useEffect(() => {
+        if (!profile?.id || profile.role !== "craftsman") {
+            setIsStatsLoading(false);
+            return;
+        }
+
+        const fetchJobStats = async () => {
+            setIsStatsLoading(true);
+
+            const supabase = createClient();
+
+            const { data, error } = await supabase
+                .from("jobs")
+                .select(
+                    `
+                        id,
+                        status,
+                        client_finished_at,
+                        craftsman_finished_at
+                    `
+                )
+                .eq("selected_craftsman_id", profile.id);
+
+            if (error) {
+                console.error(
+                    "Failed to fetch craftsman job stats:",
+                    error
+                );
+
+                setJobStats({
+                    total: 0,
+                    completed: 0,
+                });
+
+                setIsStatsLoading(false);
+                return;
+            }
+
+            const jobs = data ?? [];
+
+            const completedJobs = jobs.filter(
+                (job) =>
+                    job.status === "completed" ||
+                    Boolean(job.client_finished_at) ||
+                    Boolean(job.craftsman_finished_at)
+            );
+
+            setJobStats({
+                total: jobs.length,
+                completed: completedJobs.length,
+            });
+
+            setIsStatsLoading(false);
+        };
+
+        fetchJobStats();
+    }, [profile?.id, profile?.role]);
+
+    const completionRate =
+        jobStats.total > 0
+            ? Math.round(
+                  (jobStats.completed / jobStats.total) * 100
+              )
+            : 0;
+
     return (
-        <div
-             
-            className="mx-auto w-full max-w-6xl px-4 py-6"
-        >
+        <div className="mx-auto w-full max-w-6xl px-4 py-6">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">
+            <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="truncate text-2xl font-bold">
                         {isLoading
                             ? "..."
                             : `مرحباً ${profile?.full_name || ""}`}
@@ -54,26 +130,24 @@ export default function CraftsmanDashboardIndex() {
                     </p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                     <Link href="/craftsman/find">
-                    <Button
-                        size="sm"
-                        className="gap-2"
-                    >
-                        <Search className="h-4 w-4" />
-                        دور على شغل
-                    </Button>
-                </Link>
-                 <Link href="/craftsman/profile/edit">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                    >
-                        <Edit3 className="h-4 w-4" />
-                        تعديل الملف
-                    </Button>
-                </Link>
+                        <Button size="sm" className="gap-2">
+                            <Search className="h-4 w-4" />
+                            دور على شغل
+                        </Button>
+                    </Link>
+
+                    <Link href="/craftsman/profile/edit">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                        >
+                            <Edit3 className="h-4 w-4" />
+                            تعديل الملف
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
@@ -85,11 +159,12 @@ export default function CraftsmanDashboardIndex() {
                         <CardContent className="p-5">
                             <div className="flex items-start gap-3">
                                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
-                                    {craftsman?.avatar_url ? (
+                                    {profile?.avatar_url ? (
                                         <img
-                                            src={craftsman.avatar_url}
+                                            src={profile.avatar_url}
                                             alt={
-                                                profile?.full_name || ""
+                                                profile?.full_name ||
+                                                "صورة الملف الشخصي"
                                             }
                                             className="h-full w-full object-cover"
                                         />
@@ -113,7 +188,8 @@ export default function CraftsmanDashboardIndex() {
                                             <span>
                                                 {
                                                     verificationText[
-                                                        craftsman.verification_status
+                                                        craftsman
+                                                            .verification_status
                                                     ]
                                                 }
                                             </span>
@@ -127,7 +203,7 @@ export default function CraftsmanDashboardIndex() {
                             <div className="space-y-2 text-sm">
                                 <Link
                                     href="/profile"
-                                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+                                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>الملف العام</span>
 
@@ -135,8 +211,8 @@ export default function CraftsmanDashboardIndex() {
                                 </Link>
 
                                 <Link
-                                    href="/messages"
-                                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-muted"
+                                    href="/chats"
+                                    className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>الرسائل</span>
 
@@ -146,32 +222,35 @@ export default function CraftsmanDashboardIndex() {
                         </CardContent>
                     </Card>
 
-{/* توثيق الهوية */}
-<Link href="/craftsman/veritfy-identity" className="block">
-    <Card className="transition-colors hover:border-primary/40 hover:bg-muted/20">
-        <CardContent className="flex items-center justify-between p-5">
-            <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <BadgeCheck className="h-5 w-5" />
-                </div>
+                    {/* Identity Verification */}
+                    <Link
+                        href="/craftsman/veritfy-identity"
+                        className="block"
+                    >
+                        <Card className="transition-colors hover:border-primary/40 hover:bg-muted/20">
+                            <CardContent className="flex items-center justify-between p-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <BadgeCheck className="h-5 w-5" />
+                                    </div>
 
-                <div>
-                    <p className="text-sm font-semibold">
-                        توثيق الهوية
-                    </p>
+                                    <div>
+                                        <p className="text-sm font-semibold">
+                                            توثيق الهوية
+                                        </p>
 
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        وثّق هويتك لزيادة ثقة العملاء بحسابك
-                    </p>
-                </div>
-            </div>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            وثّق هويتك لزيادة ثقة العملاء بحسابك
+                                        </p>
+                                    </div>
+                                </div>
 
-            <span className="text-xs font-medium text-primary">
-                توثيق
-            </span>
-        </CardContent>
-    </Card>
-</Link>
+                                <span className="text-xs font-medium text-primary">
+                                    توثيق
+                                </span>
+                            </CardContent>
+                        </Card>
+                    </Link>
 
                     {/* Onboarding */}
                     <Card>
@@ -290,7 +369,9 @@ export default function CraftsmanDashboardIndex() {
                                 </p>
 
                                 <p className="mt-2 text-2xl font-bold">
-                                    0
+                                    {isStatsLoading
+                                        ? "..."
+                                        : jobStats.total}
                                 </p>
                             </CardContent>
                         </Card>
@@ -302,7 +383,9 @@ export default function CraftsmanDashboardIndex() {
                                 </p>
 
                                 <p className="mt-2 text-2xl font-bold">
-                                    {craftsman?.completion_rate ?? 0}%
+                                    {isStatsLoading
+                                        ? "..."
+                                        : `${completionRate}%`}
                                 </p>
                             </CardContent>
                         </Card>
@@ -365,9 +448,9 @@ export default function CraftsmanDashboardIndex() {
 
                             <div className="grid gap-5 md:grid-cols-2">
                                 <div className="flex gap-3">
-                                    <BriefcaseBusiness className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                    <BriefcaseBusiness className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 
-                                    <div>
+                                    <div className="min-w-0">
                                         <p className="text-xs text-muted-foreground">
                                             الخبرة
                                         </p>
@@ -381,14 +464,14 @@ export default function CraftsmanDashboardIndex() {
                                 </div>
 
                                 <div className="flex gap-3">
-                                    <Phone className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                    <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 
-                                    <div>
+                                    <div className="min-w-0">
                                         <p className="text-xs text-muted-foreground">
                                             الهاتف
                                         </p>
 
-                                        <p className="mt-1 text-sm font-medium">
+                                        <p className="mt-1 break-words text-sm font-medium">
                                             {craftsman?.phone ||
                                                 "غير مضاف"}
                                         </p>
@@ -396,14 +479,14 @@ export default function CraftsmanDashboardIndex() {
                                 </div>
 
                                 <div className="flex gap-3">
-                                    <MapPin className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 
-                                    <div>
+                                    <div className="min-w-0">
                                         <p className="text-xs text-muted-foreground">
                                             عنوان الورشة
                                         </p>
 
-                                        <p className="mt-1 text-sm font-medium">
+                                        <p className="mt-1 break-words text-sm font-medium">
                                             {craftsman?.shop_address ||
                                                 "غير مضاف"}
                                         </p>
@@ -411,7 +494,7 @@ export default function CraftsmanDashboardIndex() {
                                 </div>
 
                                 <div className="flex gap-3">
-                                    <Star className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                                    <Star className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
 
                                     <div>
                                         <p className="text-xs text-muted-foreground">
@@ -449,6 +532,7 @@ export default function CraftsmanDashboardIndex() {
                                 <h2 className="font-semibold">
                                     مناطق العمل
                                 </h2>
+
                                 <Link href="/craftsman/profile/edit">
                                     <Button
                                         variant="ghost"
@@ -479,8 +563,8 @@ export default function CraftsmanDashboardIndex() {
                     </Card>
 
                     {/* Activity */}
-                    <Card>
-                        <CardContent className="flex items-center justify-between p-6">
+                    {/* <Card>
+                        <CardContent className="flex items-center justify-between gap-4 p-6">
                             <div>
                                 <h2 className="font-semibold">
                                     آخر النشاط
@@ -491,7 +575,7 @@ export default function CraftsmanDashboardIndex() {
                                 </p>
                             </div>
 
-                            <Link href="/messages">
+                            <Link href="/chats">
                                 <Button
                                     variant="outline"
                                     className="gap-2"
@@ -501,7 +585,7 @@ export default function CraftsmanDashboardIndex() {
                                 </Button>
                             </Link>
                         </CardContent>
-                    </Card>
+                    </Card> */}
                 </div>
             </div>
         </div>

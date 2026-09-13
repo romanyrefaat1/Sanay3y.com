@@ -9,7 +9,6 @@ import {
     CalendarDays,
     CheckCircle2,
     ChevronDown,
-    ChevronLeft,
     Clock3,
     Loader2,
     MapPin,
@@ -180,9 +179,13 @@ const timeOptions = Array.from(
     { length: 48 },
     (_, index) => {
         const hour = Math.floor(index / 2);
-        const minute = index % 2 === 0 ? "00" : "30";
+        const minute =
+            index % 2 === 0 ? "00" : "30";
 
-        return `${String(hour).padStart(2, "0")}:${minute}`;
+        return `${String(hour).padStart(
+            2,
+            "0",
+        )}:${minute}`;
     },
 );
 
@@ -254,9 +257,17 @@ export default function ChatConversation({
         createClient(),
     );
 
+    /*
+     * The server tells us whether sending was initially
+     * allowed, while the realtime job status lets us disable
+     * sending immediately when the job changes.
+     */
     const canSend =
-        isSendableJobStatus(jobStatus) &&
-        initialCanSend;
+        initialCanSend &&
+        isSendableJobStatus(jobStatus);
+
+    const isCompleted =
+        jobStatus === "completed";
 
     const status =
         statusConfig[jobStatus] ?? null;
@@ -284,6 +295,15 @@ export default function ChatConversation({
         });
     }, [messages.length]);
 
+    /*
+     * Realtime:
+     * - receive new messages
+     * - receive job status changes
+     *
+     * Completed conversations can still receive realtime
+     * events, but the UI will never allow the current user
+     * to send a new message.
+     */
     useEffect(() => {
         const supabase =
             supabaseRef.current;
@@ -367,12 +387,7 @@ export default function ChatConversation({
                     }
                 },
             )
-            .subscribe((subscriptionStatus) => {
-                console.log(
-                    `[Realtime chat:${chat.id}]`,
-                    subscriptionStatus,
-                );
-            });
+            .subscribe();
 
         return () => {
             void supabase.removeChannel(
@@ -401,6 +416,10 @@ export default function ChatConversation({
 
         const content = message.trim();
 
+        /*
+         * This check is intentionally kept even though the
+         * composer is hidden when canSend is false.
+         */
         if (
             !content ||
             isSending ||
@@ -551,7 +570,7 @@ export default function ChatConversation({
             setScheduleOpen(false);
         } catch (error) {
             console.error(
-                "Failed to set agreed schedule:",
+                "Failed to set schedule:",
                 error,
             );
 
@@ -565,10 +584,10 @@ export default function ChatConversation({
 
     return (
         <div className="mx-auto flex h-[calc(100dvh-64px)] max-h-screen w-full flex-col">
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-        {/* Conversation */}
-        <div className="flex min-w-0 flex-1 flex-col pt-3 md:pt-5">
-                    {/* Top navigation */}
+            <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
+                {/* Conversation */}
+                <div className="flex min-w-0 flex-1 flex-col pt-3 md:pt-5">
+                    {/* Header */}
                     <header className="shrink-0 border-b bg-background">
                         <div className="flex h-16 items-center gap-3 px-3 sm:px-5">
                             <Button
@@ -582,7 +601,7 @@ export default function ChatConversation({
                                 </Link>
                             </Button>
 
-                            <div className="min-w-0 flex w-full h-full">
+                            <div className="min-w-0 flex h-full w-full">
                                 <div className="flex h-fit w-fit items-center gap-2">
                                     <Link href="/chats">
                                         <h1 className="font-semibold">
@@ -753,13 +772,7 @@ export default function ChatConversation({
                                                             </p>
                                                         </div>
 
-                                                        <span
-                                                            className={`mt-1 px-1 text-[11px] text-muted-foreground ${
-                                                                own
-                                                                    ? "text-right"
-                                                                    : "text-left"
-                                                            }`}
-                                                        >
+                                                        <span className="mt-1 px-1 text-[11px] text-muted-foreground">
                                                             {formatTime(
                                                                 item.created_at,
                                                             )}
@@ -778,9 +791,7 @@ export default function ChatConversation({
                         {/* Schedule agreement */}
                         {currentUserId ===
                             chat.clientId &&
-                            isSendableJobStatus(
-                                jobStatus,
-                            ) && (
+                            canSend && (
                                 <div className="mx-auto w-full max-w-3xl px-3 pb-4 sm:px-6">
                                     <Collapsible
                                         open={scheduleOpen}
@@ -824,7 +835,6 @@ export default function ChatConversation({
 
                                         <CollapsibleContent className="border-t">
                                             <div className="grid gap-4 p-4 sm:grid-cols-2">
-                                                {/* Date */}
                                                 <div className="space-y-2">
                                                     <Label>
                                                         التاريخ
@@ -887,7 +897,6 @@ export default function ChatConversation({
                                                     </Popover>
                                                 </div>
 
-                                                {/* Time */}
                                                 <div className="space-y-2">
                                                     <Label>
                                                         الوقت
@@ -904,20 +913,16 @@ export default function ChatConversation({
                                                         <SelectTrigger className="w-full">
                                                             <span className="flex items-center gap-2">
                                                                 <Clock3 className="size-4 text-muted-foreground" />
-
                                                                 <SelectValue placeholder="اختر الوقت" />
                                                             </span>
                                                         </SelectTrigger>
 
-                                                        <SelectContent
-                                                            className="max-h-72 max-w-[80vw]"
-                                                        >
+                                                        <SelectContent className="max-h-72 max-w-[80vw]">
                                                             {timeOptions.map(
                                                                 (
                                                                     time,
                                                                 ) => (
                                                                     <SelectItem
-                                                                    // className="text-red-500"
                                                                         key={
                                                                             time
                                                                         }
@@ -978,22 +983,31 @@ export default function ChatConversation({
                     <div className="shrink-0 border-t bg-background">
                         <div className="mx-auto max-w-5xl px-3 py-3 sm:px-6 sm:py-4">
                             {!canSend ? (
-                                <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-4">
-                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background">
-                                        <CheckCircle2 className="size-5 text-muted-foreground" />
-                                    </div>
+                                <div className="rounded-xl border bg-muted/30 p-4">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-background">
+                                            {isCompleted ? (
+                                                <CheckCircle2 className="size-5 text-green-600 dark:text-green-400" />
+                                            ) : (
+                                                <Clock3 className="size-5 text-muted-foreground" />
+                                            )}
+                                        </div>
 
-                                    <div>
-                                        <p className="font-semibold">
-                                            المحادثة مقفولة
-                                        </p>
+                                        <div className="min-w-0">
+                                            <p className="font-semibold">
+                                                {isCompleted
+                                                    ? "الشغلانة اكتملت"
+                                                    : "الرسائل غير متاحة حاليًا"}
+                                            </p>
 
-                                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                            {jobStatus ===
-                                            "completed"
-                                                ? "الشغلانة اكتملت، لذلك لم يعد إرسال رسائل جديدة متاحًا."
-                                                : "الشغلانة اتقفلت، لذلك لم يعد إرسال رسائل جديدة متاحًا."}
-                                        </p>
+                                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                                يمكنك مشاهدة
+                                                الرسائل السابقة،
+                                                لكن يمكنك إرسال
+                                                رسائل فقط أثناء
+                                                تنفيذ الشغلانة.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -1060,8 +1074,7 @@ export default function ChatConversation({
 
                                     <div className="mt-2 px-1">
                                         <p className="hidden text-xs text-muted-foreground lg:block">
-                                            Enter
-                                            للإرسال ·
+                                            Enter للإرسال ·
                                             Shift + Enter
                                             لسطر جديد
                                         </p>
@@ -1072,7 +1085,7 @@ export default function ChatConversation({
                     </div>
                 </div>
 
-                {/* Desktop context sidebar */}
+                {/* Desktop sidebar */}
                 <aside className="hidden w-[300px] shrink-0 border-r bg-background xl:block">
                     <div className="sticky top-0 flex h-full flex-col">
                         <div className="border-b px-5 py-5">

@@ -133,11 +133,11 @@ export default function CraftsmanCard({
                                 {craftsman.full_name}
                             </span>
 
-                            <BadgeCheck
+                            {/* <BadgeCheck
                                 className="size-5 shrink-0"
                                 style={{ color: "hsl(var(--verified))" }}
                                 aria-label="حساب موثق"
-                            />
+                            /> */}
                         </Link>
 
                         <Button

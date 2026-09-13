@@ -368,3 +368,201 @@ html {
 a, button {
   cursor: pointer;
 }
+
+/* jobs/[id]/finished PAGE */
+@keyframes success-pop {
+    0% {
+        opacity: 0;
+        transform: scale(0.65);
+    }
+
+    60% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes success-check {
+    0% {
+        opacity: 0;
+        transform: scale(0.5) rotate(-15deg);
+    }
+
+    60% {
+        opacity: 1;
+        transform: scale(1.12) rotate(3deg);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(0);
+    }
+}
+
+@keyframes rating-ring {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(1.2);
+    }
+}
+
+@keyframes rating-message {
+    0% {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slide-down {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes float {
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+@keyframes celebration {
+    0% {
+        opacity: 0;
+        transform: translateY(15px) scale(0.5);
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-45px) scale(1);
+    }
+}
+
+.animate-success-pop {
+    animation: success-pop 450ms
+        cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-success-check {
+    animation: success-check 500ms
+        cubic-bezier(0.2, 0.8, 0.2, 1) 100ms both;
+}
+
+.animate-rating-ring {
+    animation: rating-ring 450ms ease-out both;
+}
+
+.animate-rating-message {
+    animation: rating-message 180ms ease-out both;
+}
+
+.animate-slide-down {
+    animation: slide-down 200ms ease-out both;
+}
+
+.animate-float {
+    animation: float 2.5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+    animation: float 2.5s ease-in-out 700ms infinite;
+}
+
+.celebration-dot {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: hsl(var(--primary));
+    opacity: 0;
+    animation: celebration 1.4s ease-out forwards;
+}
+
+.celebration-dot-1 {
+    left: 20%;
+    top: 45%;
+    animation-delay: 100ms;
+}
+
+.celebration-dot-2 {
+    left: 32%;
+    top: 35%;
+    animation-delay: 180ms;
+}
+
+.celebration-dot-3 {
+    right: 25%;
+    top: 40%;
+    animation-delay: 250ms;
+}
+
+.celebration-dot-4 {
+    right: 34%;
+    top: 55%;
+    animation-delay: 320ms;
+}
+
+.celebration-dot-5 {
+    left: 38%;
+    top: 60%;
+    animation-delay: 400ms;
+}
+
+.celebration-dot-6 {
+    right: 18%;
+    top: 55%;
+    animation-delay: 480ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-success-pop,
+    .animate-success-check,
+    .animate-rating-ring,
+    .animate-rating-message,
+    .animate-slide-down,
+    .animate-float,
+    .animate-float-delayed,
+    .celebration-dot {
+        animation: none !important;
+    }
+
+    * {
+        scroll-behavior: auto !important;
+    }
+}

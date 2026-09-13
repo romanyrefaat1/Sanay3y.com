@@ -58,6 +58,14 @@ const applicationSchema = z.object({
             "اكتب سعر صحيح.",
         ),
 
+    priceType: z.enum(
+        ["fixed", "starting"],
+        {
+            message:
+                "اختار نوع السعر.",
+        },
+    ),
+
     message: z
         .string()
         .trim()
@@ -71,11 +79,13 @@ const applicationSchema = z.object({
 
 type ApplicationFormValues = {
     proposedPrice: string;
+    priceType: "fixed" | "starting";
     message: string;
 };
 
 type FieldName =
     | "proposedPrice"
+    | "priceType"
     | "message";
 
 function getFieldError(
@@ -118,6 +128,11 @@ export default function JobApplicationForm({
     const [proposedPrice, setProposedPrice] =
         useState("");
 
+    const [priceType, setPriceType] =
+        useState<"fixed" | "starting">(
+            "fixed",
+        );
+
     const [message, setMessage] =
         useState("");
 
@@ -140,16 +155,20 @@ export default function JobApplicationForm({
     const [alreadyApplied, setAlreadyApplied] =
         useState(false);
 
-    const [isCheckingApplication, setIsCheckingApplication] =
-        useState(true);
+    const [
+        isCheckingApplication,
+        setIsCheckingApplication,
+    ] = useState(true);
 
     const values = useMemo(
         () => ({
             proposedPrice,
+            priceType,
             message,
         }),
         [
             proposedPrice,
+            priceType,
             message,
         ],
     );
@@ -157,6 +176,12 @@ export default function JobApplicationForm({
     const proposedPriceError =
         getFieldError(
             "proposedPrice",
+            values,
+        );
+
+    const priceTypeError =
+        getFieldError(
+            "priceType",
             values,
         );
 
@@ -168,6 +193,7 @@ export default function JobApplicationForm({
 
     const hasValidForm =
         !proposedPriceError &&
+        !priceTypeError &&
         !messageError;
 
     useEffect(() => {
@@ -275,13 +301,6 @@ export default function JobApplicationForm({
             return;
         }
 
-        /*
-         * A craftsman account can exist without a
-         * craftsman_profiles row yet.
-         *
-         * Treat that account as incomplete and
-         * therefore not eligible to apply.
-         */
         if (!craftsmanProfile) {
             setError(
                 "لازم تكمل ملف الصنايعي وتوثق حسابك قبل التقديم على الشغلانات.",
@@ -376,6 +395,9 @@ export default function JobApplicationForm({
                                 .data
                                 .proposedPrice,
                         ),
+                    price_type:
+                        result.data
+                            .priceType,
                     message:
                         result.data.message?.trim() ||
                         null,
@@ -411,6 +433,7 @@ export default function JobApplicationForm({
             );
 
             setProposedPrice("");
+            setPriceType("fixed");
             setMessage("");
             setTouched({});
 
@@ -443,10 +466,6 @@ export default function JobApplicationForm({
         );
     }
 
-    /*
-     * Don't show the application form if the
-     * viewer isn't a craftsman.
-     */
     if (
         !user ||
         profile?.role !==
@@ -455,16 +474,10 @@ export default function JobApplicationForm({
         return null;
     }
 
-    /*
-     * The Job owner isn't allowed to apply.
-     */
     if (user.id === clientId) {
         return null;
     }
 
-    /*
-     * Already applied.
-     */
     if (alreadyApplied) {
         return (
             <Card>
@@ -491,9 +504,6 @@ export default function JobApplicationForm({
         );
     }
 
-    /*
-     * Job is no longer open.
-     */
     if (jobStatus !== "open") {
         return null;
     }
@@ -516,7 +526,7 @@ export default function JobApplicationForm({
         !isSubmitting;
 
     return (
-        <Card className="bg-card border-secondary/50 hover:border-primary/30">
+        <Card className="border-secondary/50 bg-card hover:border-primary/30">
             <CardContent className="p-6">
                 <div>
                     <h2 className="text-lg font-semibold">
@@ -537,6 +547,90 @@ export default function JobApplicationForm({
                     }
                     className="space-y-5"
                 >
+                    {/* Price type */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                            نوع السعر
+                        </label>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPriceType(
+                                        "fixed",
+                                    );
+                                    markTouched(
+                                        "priceType",
+                                    );
+                                }}
+                                className={`rounded-lg border px-4 py-3 text-right transition-colors ${
+                                    priceType ===
+                                    "fixed"
+                                        ? "border-primary bg-primary/10 text-foreground"
+                                        : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                }`}
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-sm font-medium">
+                                        سعر ثابت
+                                    </span>
+
+                                    {priceType ===
+                                        "fixed" && (
+                                        <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                </div>
+
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    السعر النهائي للتنفيذ
+                                </p>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPriceType(
+                                        "starting",
+                                    );
+                                    markTouched(
+                                        "priceType",
+                                    );
+                                }}
+                                className={`rounded-lg border px-4 py-3 text-right transition-colors ${
+                                    priceType ===
+                                    "starting"
+                                        ? "border-primary bg-primary/10 text-foreground"
+                                        : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                                }`}
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-sm font-medium">
+                                        يبدأ من
+                                    </span>
+
+                                    {priceType ===
+                                        "starting" && (
+                                        <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                </div>
+
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    أقل سعر ممكن تبدأ منه
+                                </p>
+                            </button>
+                        </div>
+
+                        {touched.priceType &&
+                            priceTypeError && (
+                                <p className="text-xs text-destructive">
+                                    {
+                                        priceTypeError
+                                    }
+                                </p>
+                            )}
+                    </div>
+
                     {/* Proposed price */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -545,7 +639,10 @@ export default function JobApplicationForm({
                                 className="flex items-center gap-2 text-sm font-medium"
                             >
                                 <Wallet className="h-4 w-4 text-muted-foreground" />
-                                السعر المقترح
+                                {priceType ===
+                                "starting"
+                                    ? "السعر يبدأ من"
+                                    : "السعر المقترح"}
                             </label>
 
                             <span className="text-xs text-muted-foreground">
@@ -601,8 +698,10 @@ export default function JobApplicationForm({
 
                         {!touched.proposedPrice && (
                             <p className="text-xs text-muted-foreground">
-                                اكتب السعر اللي هتنفذ
-                                بيه الشغلانة.
+                                {priceType ===
+                                "starting"
+                                    ? "اكتب أقل سعر ممكن تنفذ بيه الشغلانة."
+                                    : "اكتب السعر النهائي اللي هتنفذ بيه الشغلانة."}
                             </p>
                         )}
 
@@ -707,110 +806,111 @@ export default function JobApplicationForm({
                         </div>
                     </div>
 
-                   {/* Profile / Verification warning */}
-{isProfileIncomplete && (
-    <div className="min-w-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-amber-700 dark:text-amber-400">
-        <p className="break-words">
-            لازم تكمل ملف الصنايعي وتوثق حسابك
-            عشان تقدر تقدم على الشغلانات.
-        </p>
+                    {/* Profile / Verification warning */}
+                    {isProfileIncomplete && (
+                        <div className="min-w-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-amber-700 dark:text-amber-400">
+                            <p className="break-words">
+                                لازم تكمل ملف الصنايعي وتوثق حسابك
+                                عشان تقدر تقدم على الشغلانات.
+                            </p>
 
-        <Separator className="my-2" />
+                            <Separator className="my-2" />
 
-        <Link
-            href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
-        >
-            <Button
-                variant="link"
-                size="sm"
-                className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
-            >
-                لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف دوس على الجملة دي دوس على الجملة دي
-            </Button>
-        </Link>
-    </div>
-)}
+                            <Link
+                                href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
+                            >
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
+                                >
+                                    لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
 
-{!isProfileIncomplete &&
-    !isVerified && (
-        <div className="min-w-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-amber-700 dark:text-amber-400">
-            <p className="break-words">
-                لازم يكون حسابك موثق عشان تقدر تقدم
-                على الشغلانات.
-            </p>
+                    {!isProfileIncomplete &&
+                        !isVerified && (
+                            <div className="min-w-0 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm leading-6 text-amber-700 dark:text-amber-400">
+                                <p className="break-words">
+                                    لازم يكون حسابك موثق عشان تقدر تقدم
+                                    على الشغلانات.
+                                </p>
 
-            <Separator className="my-2" />
+                                <Separator className="my-2" />
 
-            <Link
-                href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
-            >
-                <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
-                >
-                    لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف دوس على الجملة دي دوس على الجملة دي
-                </Button>
-            </Link>
-        </div>
-    )}
+                                <Link
+                                    href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
+                                >
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
+                                    >
+                                        لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
 
-{/* Availability warning */}
-{craftsmanProfile &&
-    !isAvailable && (
-        <div className="min-w-0 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <p className="break-words">
-                حسابك ظاهر حاليًا كغير متاح، لذلك لن تقدر
-                تقدم على هذه الشغلانة.
-            </p>
+                    {/* Availability warning */}
+                    {craftsmanProfile &&
+                        !isAvailable && (
+                            <div className="min-w-0 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                                <p className="break-words">
+                                    حسابك ظاهر حاليًا كغير متاح، لذلك لن تقدر
+                                    تقدم على هذه الشغلانة.
+                                </p>
 
-            <Separator className="my-2" />
+                                <Separator className="my-2" />
 
-            <Link
-                href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
-            >
-                <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
-                >
-                    لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف دوس على الجملة دي دوس على الجملة دي
-                </Button>
-            </Link>
-        </div>
-    )}
+                                <Link
+                                    href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
+                                >
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
+                                    >
+                                        لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف
+                                    </Button>
+                                </Link>
+                            </div>
+                        )}
 
-{error && (
-    <div className="min-w-0 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-        <p className="break-words">
-            {error}
-        </p>
+                    {error && (
+                        <div className="min-w-0 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                            <p className="break-words">
+                                {error}
+                            </p>
 
-        <Separator className="my-2" />
+                            <Separator className="my-2" />
 
-        <Link
-            href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
-        >
-            <Button
-                variant="link"
-                size="sm"
-                className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
-            >
-                لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف دوس على الجملة دي دوس على الجملة دي
-            </Button>
-        </Link>
-    </div>
-)}
+                            <Link
+                                href={`/craftsman/profile/edit?backTo=/jobs/${jobId}&name=الشغلانة اللي كنت فيها دلوقتي`}
+                            >
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto max-w-full whitespace-normal p-0 text-right text-foreground/70 hover:text-foreground"
+                                >
+                                    لو حابب تعدل ملفك تقدر تعدله من صفحة تعديل الملف
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
 
-{success && (
-    <div className="flex min-w-0 items-start gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3 text-sm text-green-600">
-        <Check className="mt-0.5 h-4 w-4 shrink-0" />
+                    {success && (
+                        <div className="flex min-w-0 items-start gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-3 text-sm text-green-600">
+                            <Check className="mt-0.5 h-4 w-4 shrink-0" />
 
-        <p className="break-words">
-            {success}
-        </p>
-    </div>
-)}
+                            <p className="break-words">
+                                {success}
+                            </p>
+                        </div>
+                    )}
+
                     <Button
                         type="submit"
                         disabled={!canSubmit}

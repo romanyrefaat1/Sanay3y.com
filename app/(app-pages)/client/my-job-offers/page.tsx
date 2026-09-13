@@ -43,6 +43,10 @@ type MonthGroup = {
     jobs: Job[];
 };
 
+type SearchParams = {
+    status?: string;
+};
+
 const arabicMonths = [
     "يناير",
     "فبراير",
@@ -86,7 +90,7 @@ function getStatus(status: string) {
             return {
                 label: "مفتوحة",
                 className:
-                    "border-blue-200 bg-blue-50 text-blue-700",
+                    "border-blue-500/30 bg-blue-500/10 text-blue-400",
                 icon: Search,
             };
 
@@ -94,7 +98,7 @@ function getStatus(status: string) {
             return {
                 label: "قيد التنفيذ",
                 className:
-                    "border-amber-200 bg-amber-50 text-amber-700",
+                    "border-amber-500/30 bg-amber-500/10 text-amber-400",
                 icon: Clock3,
             };
 
@@ -102,7 +106,7 @@ function getStatus(status: string) {
             return {
                 label: "مكتملة",
                 className:
-                    "border-green-200 bg-green-50 text-green-700",
+                    "border-green-500/30 bg-green-500/10 text-green-400",
                 icon: CheckCircle2,
             };
 
@@ -110,7 +114,7 @@ function getStatus(status: string) {
             return {
                 label: "ملغاة",
                 className:
-                    "border-red-200 bg-red-50 text-red-700",
+                    "border-red-500/30 bg-red-500/10 text-red-400",
                 icon: XCircle,
             };
 
@@ -118,7 +122,7 @@ function getStatus(status: string) {
             return {
                 label: "جديدة",
                 className:
-                    "border-slate-200 bg-slate-50 text-slate-700",
+                    "border-muted-foreground/20 bg-muted/40 text-muted-foreground",
                 icon: Clock3,
             };
     }
@@ -164,7 +168,70 @@ function JobStatusBadge({ status }: { status: string }) {
     );
 }
 
-export default async function ClientMyWorkPage() {
+function StatCard({
+    label,
+    value,
+    icon: Icon,
+    href,
+    active = false,
+    iconClassName,
+}: {
+    label: string;
+    value: number;
+    icon: typeof BriefcaseBusiness;
+    href: string;
+    active?: boolean;
+    iconClassName: string;
+}) {
+    return (
+        <Link href={href} className="block">
+            <Card
+                className={`h-full transition-colors hover:border-primary/40 hover:bg-accent/30 ${
+                    active ? "border-primary/50 bg-primary/[0.03]" : ""
+                }`}
+            >
+                <CardContent className="flex items-center gap-4 p-5">
+                    <div
+                        className={`flex size-11 shrink-0 items-center justify-center rounded-md ${iconClassName}`}
+                    >
+                        <Icon className="size-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                        <p className="text-sm text-muted-foreground">
+                            {label}
+                        </p>
+
+                        <p className="mt-0.5 text-2xl font-bold">
+                            {value}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+        </Link>
+    );
+}
+
+export default async function ClientMyWorkPage({
+    searchParams,
+}: {
+    searchParams: Promise<SearchParams>;
+}) {
+    const params = await searchParams;
+    const selectedStatus = params.status;
+
+    const validStatuses = [
+        "open",
+        "in_progress",
+        "completed",
+    ];
+
+    const activeStatus = validStatuses.includes(
+        selectedStatus || "",
+    )
+        ? selectedStatus
+        : undefined;
+
     const supabase = await createClient();
 
     const {
@@ -200,17 +267,35 @@ export default async function ClientMyWorkPage() {
 
     const clientJobs = (jobs ?? []) as Job[];
 
-    const monthGroups = groupJobsByMonth(clientJobs);
+    const totalJobs = clientJobs.length;
 
-    const activeJobs = clientJobs.filter(
-        (job) =>
-            job.status === "open" ||
-            job.status === "in_progress",
+    const openJobs = clientJobs.filter(
+        (job) => job.status === "open",
+    ).length;
+
+    const inProgressJobs = clientJobs.filter(
+        (job) => job.status === "in_progress",
     ).length;
 
     const completedJobs = clientJobs.filter(
         (job) => job.status === "completed",
     ).length;
+
+    const filteredJobs = activeStatus
+        ? clientJobs.filter(
+              (job) => job.status === activeStatus,
+          )
+        : clientJobs;
+
+    const monthGroups = groupJobsByMonth(filteredJobs);
+
+    const getStatusHref = (status?: string) => {
+        if (!status) {
+            return "/client/my-job-offers";
+        }
+
+        return `/client/my-job-offers?status=${status}`;
+    };
 
     return (
         <main className="min-h-screen bg-background">
@@ -236,7 +321,11 @@ export default async function ClientMyWorkPage() {
                             </p>
                         </div>
 
-                        <Button asChild size="lg" className="shrink-0 lg:hidden">
+                        <Button
+                            asChild
+                            size="lg"
+                            className="shrink-0 lg:hidden"
+                        >
                             <Link href="/client/job/new">
                                 <Plus className="size-4" />
                                 شغلانة جديدة
@@ -246,61 +335,70 @@ export default async function ClientMyWorkPage() {
                 </div>
 
                 {/* Stats */}
-                <div className="mb-10 grid gap-4 sm:grid-cols-3">
-    <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <BriefcaseBusiness className="size-5" />
-            </div>
+                <div className="mb-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <StatCard
+    label="كل الطلبات"
+    value={totalJobs}
+    icon={BriefcaseBusiness}
+    href={getStatusHref()}
+    active={!activeStatus}
+    iconClassName="bg-primary/10 text-primary"
+/>
 
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    إجمالي الشغلانات
-                </p>
+<StatCard
+    label="مفتوحة"
+    value={openJobs}
+    icon={Search}
+    href={getStatusHref("open")}
+    active={activeStatus === "open"}
+    iconClassName="bg-blue-500/10 text-blue-400"
+/>
 
-                <p className="mt-0.5 text-2xl font-bold">
-                    {clientJobs.length}
-                </p>
-            </div>
-        </CardContent>
-    </Card>
+<StatCard
+    label="قيد التنفيذ"
+    value={inProgressJobs}
+    icon={Clock3}
+    href={getStatusHref("in_progress")}
+    active={activeStatus === "in_progress"}
+    iconClassName="bg-amber-500/10 text-amber-400"
+/>
 
-    <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
-                <Clock3 className="size-5" />
-            </div>
+<StatCard
+    label="مكتملة"
+    value={completedJobs}
+    icon={CheckCircle2}
+    href={getStatusHref("completed")}
+    active={activeStatus === "completed"}
+    iconClassName="bg-green-500/10 text-green-400"
+/>
+                </div>
 
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    شغلانات نشطة
-                </p>
+                {/* Active filter */}
+                {activeStatus && (
+                    <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border bg-muted/30 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                                عرض:
+                            </span>
 
-                <p className="mt-0.5 text-2xl font-bold">
-                    {activeJobs}
-                </p>
-            </div>
-        </CardContent>
-    </Card>
+                            <JobStatusBadge status={activeStatus} />
 
-    <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-info/10 text-info">
-                <CheckCircle2 className="size-5" />
-            </div>
+                            <span className="text-sm text-muted-foreground">
+                                ({filteredJobs.length})
+                            </span>
+                        </div>
 
-            <div>
-                <p className="text-sm text-muted-foreground">
-                    شغلانات مكتملة
-                </p>
-
-                <p className="mt-0.5 text-2xl font-bold">
-                    {completedJobs}
-                </p>
-            </div>
-        </CardContent>
-    </Card>
-</div>
+                        <Button
+                            asChild
+                            variant="ghost"
+                            size="sm"
+                        >
+                            <Link href="/client/my-job-offers">
+                                عرض الكل
+                            </Link>
+                        </Button>
+                    </div>
+                )}
 
                 {/* Empty state */}
                 {clientJobs.length === 0 ? (
@@ -319,10 +417,39 @@ export default async function ClientMyWorkPage() {
                                 وتقدر تتابع حالتها وتفاصيلها من نفس المكان.
                             </p>
 
-                            <Button asChild className="mt-6">
+                            <Button
+                                asChild
+                                className="mt-6"
+                            >
                                 <Link href="/client/job/new">
                                     <Plus className="size-4" />
                                     أنشئ أول شغلانة
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : filteredJobs.length === 0 ? (
+                    <Card className="border-dashed">
+                        <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                            <div className="mb-5 flex size-14 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                <Search className="size-7" />
+                            </div>
+
+                            <h2 className="text-2xl font-bold">
+                                مفيش شغلانات بالحالة دي
+                            </h2>
+
+                            <p className="mt-2 max-w-md text-muted-foreground">
+                                مفيش طلبات حالياً بالحالة اللي اخترتها.
+                            </p>
+
+                            <Button
+                                asChild
+                                variant="outline"
+                                className="mt-6"
+                            >
+                                <Link href="/client/my-job-offers">
+                                    عرض كل الشغلانات
                                 </Link>
                             </Button>
                         </CardContent>

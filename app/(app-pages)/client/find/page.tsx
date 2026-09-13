@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import FindFilters from "./(components)/find-filters";
 import CraftsmanList from "./(components)/craftsman-list";
 
-
 type SearchParams = {
     q?: string;
     workType?: string;
@@ -15,6 +14,31 @@ type SearchParams = {
 
 type PageProps = {
     searchParams: Promise<SearchParams>;
+};
+
+type Review = {
+    reviewee_id: string;
+    work_rating: number | null;
+    respect_rating: number | null;
+};
+
+type Craftsman = {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    bio: string | null;
+    experience_years: number | null;
+    areas: string[];
+    shop_address: string | null;
+    work_type: string | null;
+    verification_status: string;
+    is_available: boolean;
+    average_response_time_minutes: number | null;
+    response_rate: number;
+    completion_rate: number;
+    work_rating: number | null;
+    respect_rating: number | null;
+    review_count: number;
 };
 
 async function ClientFindContent({
@@ -96,6 +120,7 @@ async function ClientFindContent({
                 <p className="text-sm font-medium text-destructive">
                     حصلت مشكلة أثناء تحميل الصنايعية
                 </p>
+
                 <p className="mt-1 text-sm text-destructive/80">
                     جرب تحدّث الصفحة تاني
                 </p>
@@ -103,7 +128,7 @@ async function ClientFindContent({
         );
     }
 
-    let craftsmen = (data || []).map((item: any) => ({
+    let craftsmen: Craftsman[] = (data || []).map((item: any) => ({
         id: item.id,
         full_name: item.profiles?.full_name || "صنايعي",
         avatar_url: item.profiles?.avatar_url || null,
@@ -118,20 +143,106 @@ async function ClientFindContent({
             item.average_response_time_minutes ?? null,
         response_rate: Number(item.response_rate || 0),
         completion_rate: Number(item.completion_rate || 0),
+
+        // Filled below from actual reviews.
+        work_rating: null,
+        respect_rating: null,
+        review_count: 0,
     }));
 
-    // Name/bio search spans a joined table + a local column, which
-    // Supabase's .or() can't express in one filter — narrow it here
-    // instead, after the fetch (results are capped at 50 rows, so this
-    // stays cheap).
+    /*
+     * Name/bio search spans a joined table + a local column,
+     * so narrow it here after fetching the capped result set.
+     */
     if (q) {
         const needle = q.toLowerCase();
 
         craftsmen = craftsmen.filter(
-            (c) =>
-                c.full_name.toLowerCase().includes(needle) ||
-                (c.bio?.toLowerCase().includes(needle) ?? false)
+            (craftsman) =>
+                craftsman.full_name.toLowerCase().includes(needle) ||
+                (craftsman.bio?.toLowerCase().includes(needle) ?? false)
         );
+    }
+
+    /*
+     * Fetch all reviews for the craftsmen in one query.
+     *
+     * We intentionally keep work_rating and respect_rating separate.
+     * They represent two different things and should not be merged into
+     * one artificial rating.
+     */
+    const craftsmanIds = craftsmen.map((craftsman) => craftsman.id);
+
+    if (craftsmanIds.length > 0) {
+        const { data: reviews, error: reviewsError } = await supabase
+            .from("reviews")
+            .select(`
+                reviewee_id,
+                work_rating,
+                respect_rating
+            `)
+            .in("reviewee_id", craftsmanIds)
+            .eq("reviewee_role", "craftsman");
+
+        if (reviewsError) {
+            console.error("Failed to fetch craftsman reviews:", reviewsError);
+        } else {
+            const reviewsByCraftsman = new Map<string, Review[]>();
+
+            for (const review of (reviews ?? []) as Review[]) {
+                const existing =
+                    reviewsByCraftsman.get(review.reviewee_id) ?? [];
+
+                existing.push(review);
+
+                reviewsByCraftsman.set(
+                    review.reviewee_id,
+                    existing
+                );
+            }
+
+            craftsmen = craftsmen.map((craftsman) => {
+                const reviewsForCraftsman =
+                    reviewsByCraftsman.get(craftsman.id) ?? [];
+
+                const workRatings = reviewsForCraftsman
+                    .map((review) => review.work_rating)
+                    .filter(
+                        (rating): rating is number =>
+                            rating !== null
+                    );
+
+                const respectRatings = reviewsForCraftsman
+                    .map((review) => review.respect_rating)
+                    .filter(
+                        (rating): rating is number =>
+                            rating !== null
+                    );
+
+                const workRating =
+                    workRatings.length > 0
+                        ? workRatings.reduce(
+                              (sum, rating) => sum + rating,
+                              0
+                          ) / workRatings.length
+                        : null;
+
+                const respectRating =
+                    respectRatings.length > 0
+                        ? respectRatings.reduce(
+                              (sum, rating) => sum + rating,
+                              0
+                          ) / respectRatings.length
+                        : null;
+
+                return {
+                    ...craftsman,
+                    work_rating: workRating,
+                    respect_rating: respectRating,
+                    review_count: reviewsForCraftsman.length,
+                };
+            });
+        }
     }
 
     return (
@@ -149,33 +260,15 @@ async function ClientFindContent({
     );
 }
 
-function Loading() {
+function ContentLoading() {
     return (
-        <div
-            className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
-        >
-            <div className="space-y-3">
-                <div className="h-9 w-56 animate-pulse rounded-lg bg-muted" />
-                <div className="h-5 w-72 animate-pulse rounded-lg bg-muted" />
-            </div>
+        <div className="flex flex-col gap-6 lg:flex-row-reverse lg:items-start">
+            <div className="h-64 w-full animate-pulse rounded-lg bg-muted lg:w-72" />
 
-            <div className="mt-8 h-14 animate-pulse rounded-lg bg-muted" />
-
-            <div className="mt-4 flex gap-2">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                        key={i}
-                        className="h-9 w-20 animate-pulse rounded-full bg-muted"
-                    />
-                ))}
-            </div>
-
-            <div className="mt-8 flex flex-col gap-6 lg:flex-row-reverse">
-                <div className="h-64 w-full animate-pulse rounded-lg bg-muted lg:w-72" />
-                <div className="flex-1 space-y-4">
-                    <div className="h-32 animate-pulse rounded-lg bg-muted" />
-                    <div className="h-32 animate-pulse rounded-lg bg-muted" />
-                </div>
+            <div className="flex-1 space-y-4">
+                <div className="h-32 animate-pulse rounded-lg bg-muted" />
+                <div className="h-32 animate-pulse rounded-lg bg-muted" />
+                <div className="h-32 animate-pulse rounded-lg bg-muted" />
             </div>
         </div>
     );
@@ -187,26 +280,31 @@ export default async function ClientFindPage({
     const params = await searchParams;
 
     return (
-        <Suspense fallback={<Loading />}>
-            <main
-                className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
+        <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+            {/* Static content — never suspended */}
+            <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span>لوحة التحكم</span>
+                <span className="text-muted-foreground/50">‹</span>
+                <span className="text-foreground">
+                    دور على صنايعي
+                </span>
+            </nav>
+
+            <div className="mb-8">
+                <h1>دور على صنايعي</h1>
+
+                <p className="mt-2 text-[15px] text-muted-foreground">
+                    لاقي الصنايعي المناسب لشغلك في منطقتك
+                </p>
+            </div>
+
+            {/* Only the database-dependent part suspends */}
+            <Suspense
+                key={JSON.stringify(params)}
+                fallback={<ContentLoading />}
             >
-                <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <span>لوحة التحكم</span>
-                    <span className="text-muted-foreground/50">‹</span>
-                    <span className="text-foreground">دور على صنايعي</span>
-                </nav>
-
-                <div className="mb-8">
-                    <h1>دور على صنايعي</h1>
-
-                    <p className="mt-2 text-[15px] text-muted-foreground">
-                        لاقي الصنايعي المناسب لشغلك في منطقتك
-                    </p>
-                </div>
-
                 <ClientFindContent searchParams={params} />
-            </main>
-        </Suspense>
+            </Suspense>
+        </main>
     );
 }

@@ -3,120 +3,160 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-Home,
-Search,
-Briefcase,
-MessageSquare,
-User,
-BadgeCheck,
+  Home,
+  Search,
+  Briefcase,
+  MessageSquare,
+  User,
+  BadgeCheck,
 } from "lucide-react";
 
+import { useUser } from "@/contexts/user-context";
+
 const craftsmanNavItems = [
-{ href: "/dashboard", label: "الرئيسية", icon: Home },
-{ href: "/craftsman/find", label: "الشغلانات المتاحة", icon: Search },
-{ href: "/craftsman/jobs", label: "شغلي", icon: Briefcase },
-{ href: "/chats", label: "الرسائل", icon: MessageSquare },
-{ href: "/craftsman/my-work", label: "شغلي", icon: MessageSquare },
-{ href: "/profile", label: "حسابي", icon: User },
+  { href: "/dashboard", label: "الرئيسية", icon: Home },
+  {
+    href: "/craftsman/find",
+    label: "الشغلانات المتاحة",
+    icon: Search,
+  },
+  {
+    href: "/chats",
+    label: "الرسائل",
+    icon: MessageSquare,
+  },
+  {
+    href: "/craftsman/my-work",
+    label: "شغلي",
+    icon: Briefcase,
+  },
+  {
+    href: "/profile",
+    label: "حسابي",
+    icon: User,
+    isProfile: true,
+  },
 ];
 
 export function CraftsmanNavbar({
-isVerified = false,
+  isVerified = false,
 }: {
-isVerified?: boolean;
+  isVerified?: boolean;
 }) {
-const pathname = usePathname();
+  const pathname = usePathname();
+  const { profile } = useUser();
 
-return (
-<>
-{/* Desktop top navbar */} <nav
-     className="hidden md:flex items-center h-16 px-6 gap-8 border-b border-primary/20 bg-primary"
-   >
-<Link
-href="/dashboard"
-className="text-lg font-bold shrink-0 text-primary-foreground"
-style={{ fontFamily: "var(--font-cairo)" }}
->
-صنايعي<span className="text-white/70">.</span>كوم </Link>
-    <div className="h-6 w-px bg-white/20" />
+  const profileHref = profile?.id
+    ? `/profile/${profile.id}`
+    : "/profile";
 
-    <div className="flex items-stretch h-full">
-      {craftsmanNavItems.map((item) => {
-        const active = pathname === item.href;
+  return (
+    <>
+      {/* Desktop top navbar */}
+      <nav className="hidden h-16 items-center gap-8 border-b border-primary/20 bg-primary px-6 md:flex">
+        <Link
+          href="/dashboard"
+          className="shrink-0 text-lg font-bold text-primary-foreground"
+          style={{
+            fontFamily: "var(--font-cairo)",
+          }}
+        >
+          صنايعي
+          <span className="text-white/70">.</span>
+          كوم
+        </Link>
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={[
-              "flex items-center px-4 h-full text-[15px]",
-              "relative transition-colors",
-              active
-                ? "text-white font-bold"
-                : "text-white/75 font-medium hover:text-white",
-            ].join(" ")}
-            style={{ fontFamily: "var(--font-cairo)" }}
-          >
-            {item.label}
+        <div className="h-6 w-px bg-white/20" />
 
-            {active && (
-              <span className="absolute bottom-0 inset-x-4 h-[2px] rounded-t-full bg-white" />
-            )}
-          </Link>
-        );
-      })}
-    </div>
+        <div className="flex h-full items-stretch">
+          {craftsmanNavItems.map((item) => {
+            const href = item.isProfile
+              ? profileHref
+              : item.href;
 
-    <div className="mr-auto flex items-center gap-4">
-      {isVerified && (
-        <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
-          <BadgeCheck className="h-3.5 w-3.5" />
-          حساب موثق
-        </span>
-      )}
-    </div>
-  </nav>
+            const active = item.isProfile
+              ? !!profile?.id &&
+                pathname === `/profile/${profile.id}`
+              : pathname === item.href;
 
-  {/* Mobile bottom navbar */}
-  <nav
-    className="md:hidden fixed bottom-0 inset-x-0 z-50 w-full border-t border-border bg-background max-w-screen"
-  >
-    <div className="flex w-full min-w-0">
-      {craftsmanNavItems.map((item) => {
-        const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                className={[
+                  "relative flex h-full items-center px-4 text-[15px]",
+                  "transition-colors",
+                  active
+                    ? "font-bold text-white"
+                    : "font-medium text-white/75 hover:text-white",
+                ].join(" ")}
+                style={{
+                  fontFamily: "var(--font-cairo)",
+                }}
+              >
+                {item.label}
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={[
-              "relative flex min-w-0 flex-1 flex-col",
-              "items-center justify-center gap-1",
-              "py-2.5 min-h-[58px]",
-              "transition-colors",
-              active
-                ? "text-primary"
-                : "text-muted-foreground hover:text-foreground",
-            ].join(" ")}
-          >
-            {active && (
-              <span className="absolute top-0 inset-x-5 h-[2px] rounded-b-full bg-primary" />
-            )}
+                {active && (
+                  <span className="absolute inset-x-4 bottom-0 h-[2px] rounded-t-full bg-white" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
 
-            <item.icon
-              className="h-5 w-5 shrink-0"
-              strokeWidth={active ? 2.4 : 2}
-            />
-
-            <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
-              {item.label}
+        <div className="mr-auto flex items-center gap-4">
+          {isVerified && (
+            <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              حساب موثق
             </span>
-          </Link>
-        );
-      })}
-    </div>
-  </nav>
-</>
+          )}
+        </div>
+      </nav>
 
-);
+      {/* Mobile bottom navbar */}
+      <nav className="fixed inset-x-0 bottom-0 z-50 w-full max-w-screen border-t border-border bg-background md:hidden">
+        <div className="flex w-full min-w-0">
+          {craftsmanNavItems.map((item) => {
+            const href = item.isProfile
+              ? profileHref
+              : item.href;
+
+            const active = item.isProfile
+              ? !!profile?.id &&
+                pathname === `/profile/${profile.id}`
+              : pathname === item.href;
+
+            return (
+              <Link
+                key={item.href}
+                href={href}
+                className={[
+                  "relative flex min-w-0 flex-1 flex-col",
+                  "min-h-[58px] items-center justify-center gap-1 py-2.5",
+                  "transition-colors",
+                  active
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                ].join(" ")}
+              >
+                {active && (
+                  <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
+                )}
+
+                <item.icon
+                  className="h-5 w-5 shrink-0"
+                  strokeWidth={active ? 2.4 : 2}
+                />
+
+                <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </>
+  );
 }
