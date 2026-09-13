@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         }
 
         const baseUrl =
-            process.env.APP_URL ||
+            process.env.NEXT_PUBLIC_APP_URL_FULL ||
             "https://san3y.vercel.app";
 
         const results = [];
