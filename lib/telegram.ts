@@ -25,11 +25,17 @@ export function getTelegramBotToken(botType: TelegramBotType) {
     return token;
 }
 
-export function getTelegramBotUsername(botType: TelegramBotType) {
+export function getTelegramBotUsername(
+    botType: TelegramBotType
+) {
     const username = BOT_USERNAMES[botType];
 
     if (!username) {
-        throw new Error(`Missing Telegram username for ${botType} bot`);
+        throw new Error(
+            `Missing Telegram username for ${botType} bot. ` +
+            `Expected environment variable: ` +
+            `TELEGRAM_${botType.toUpperCase()}_BOT_USERNAME`
+        );
     }
 
     return username;
