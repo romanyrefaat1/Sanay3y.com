@@ -16,54 +16,47 @@ export function ApplicationScrollHandler({
         }
 
         let cancelled = false;
+        let observer: MutationObserver | null = null;
+        let timeout: ReturnType<typeof setTimeout> | null = null;
 
-        const findApplication = () => {
+        const findAndScroll = () => {
+            if (cancelled) {
+                return true;
+            }
+
             const element = document.getElementById(
                 `application-${applicationId}`,
             );
 
-            if (element) {
+            if (!element) {
+                return false;
+            }
+
+            requestAnimationFrame(() => {
+                if (cancelled) {
+                    return;
+                }
+
                 element.scrollIntoView({
                     behavior: "smooth",
                     block: "center",
                 });
+            });
 
-                return true;
-            }
+            observer?.disconnect();
 
-            return false;
+            return true;
         };
 
-        const handleApplicationsLoaded = () => {
-            if (cancelled) {
-                return;
-            }
-
-            if (!findApplication()) {
-                toast.error("لم يتم العثور على الطلب المطلوب.");
-            }
-
-            observer.disconnect();
-        };
-
-        const loadedElement = document.querySelector(
-            "[data-applications-loaded='true']",
-        );
-
-        if (loadedElement) {
-            handleApplicationsLoaded();
-
+        // Try immediately
+        if (findAndScroll()) {
             return;
         }
 
-        const observer = new MutationObserver(() => {
-            const applicationsLoaded =
-                document.querySelector(
-                    "[data-applications-loaded='true']",
-                );
-
-            if (applicationsLoaded) {
-                handleApplicationsLoaded();
+        // Watch the DOM until the application actually appears
+        observer = new MutationObserver(() => {
+            if (findAndScroll()) {
+                observer?.disconnect();
             }
         });
 
@@ -72,9 +65,30 @@ export function ApplicationScrollHandler({
             subtree: true,
         });
 
+        // Don't wait forever
+        timeout = setTimeout(() => {
+            if (cancelled) {
+                return;
+            }
+
+            observer?.disconnect();
+
+            const element = document.getElementById(
+                `application-${applicationId}`,
+            );
+
+            if (!element) {
+                toast.error("لم يتم العثور على الطلب المطلوب.");
+            }
+        }, 5000);
+
         return () => {
             cancelled = true;
-            observer.disconnect();
+            observer?.disconnect();
+
+            if (timeout) {
+                clearTimeout(timeout);
+            }
         };
     }, [applicationId]);
 
