@@ -29,7 +29,6 @@ type Craftsman = {
     bio: string | null;
     experience_years: number | null;
     areas: string[];
-    shop_address: string | null;
     work_type: string | null;
     verification_status: string;
     is_available: boolean;
@@ -48,14 +47,6 @@ async function ClientFindContent({
 }) {
     const supabase = await createClient();
 
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-        return null;
-    }
-
     const q = searchParams.q?.trim() || "";
     const workType = searchParams.workType?.trim() || "";
     const area = searchParams.area?.trim() || "";
@@ -71,7 +62,6 @@ async function ClientFindContent({
             bio,
             experience_years,
             areas,
-            shop_address,
             work_type,
             verification_status,
             is_available,
@@ -79,6 +69,7 @@ async function ClientFindContent({
             response_rate,
             completion_rate,
             profiles!inner (
+                id,
                 full_name,
                 avatar_url,
                 is_active,
@@ -128,14 +119,13 @@ async function ClientFindContent({
         );
     }
 
-    let craftsmen: Craftsman[] = (data || []).map((item: any) => ({
+    let craftsmen: Craftsman[] = (data ?? []).map((item: any) => ({
         id: item.id,
         full_name: item.profiles?.full_name || "صنايعي",
         avatar_url: item.profiles?.avatar_url || null,
         bio: item.bio || null,
         experience_years: item.experience_years ?? null,
         areas: item.areas || [],
-        shop_address: item.shop_address || null,
         work_type: item.work_type || null,
         verification_status: item.verification_status,
         is_available: item.is_available ?? false,
@@ -143,16 +133,15 @@ async function ClientFindContent({
             item.average_response_time_minutes ?? null,
         response_rate: Number(item.response_rate || 0),
         completion_rate: Number(item.completion_rate || 0),
-
-        // Filled below from actual reviews.
         work_rating: null,
         respect_rating: null,
         review_count: 0,
     }));
 
     /*
-     * Name/bio search spans a joined table + a local column,
-     * so narrow it here after fetching the capped result set.
+     * Search by craftsman name or bio.
+     * The database query handles the structured filters above,
+     * while name/bio search is performed on the fetched result set.
      */
     if (q) {
         const needle = q.toLowerCase();
@@ -165,27 +154,28 @@ async function ClientFindContent({
     }
 
     /*
-     * Fetch all reviews for the craftsmen in one query.
-     *
-     * We intentionally keep work_rating and respect_rating separate.
-     * They represent two different things and should not be merged into
-     * one artificial rating.
+     * Fetch reviews for the visible craftsmen in one query.
      */
     const craftsmanIds = craftsmen.map((craftsman) => craftsman.id);
 
     if (craftsmanIds.length > 0) {
         const { data: reviews, error: reviewsError } = await supabase
             .from("reviews")
-            .select(`
+            .select(
+                `
                 reviewee_id,
                 work_rating,
                 respect_rating
-            `)
+                `
+            )
             .in("reviewee_id", craftsmanIds)
             .eq("reviewee_role", "craftsman");
 
         if (reviewsError) {
-            console.error("Failed to fetch craftsman reviews:", reviewsError);
+            console.error(
+                "Failed to fetch craftsman reviews:",
+                reviewsError
+            );
         } else {
             const reviewsByCraftsman = new Map<string, Review[]>();
 
@@ -281,9 +271,8 @@ export default async function ClientFindPage({
 
     return (
         <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-            {/* Static content — never suspended */}
             <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-                <span>لوحة التحكم</span>
+                <span>الرئيسية</span>
                 <span className="text-muted-foreground/50">‹</span>
                 <span className="text-foreground">
                     دور على صنايعي
@@ -298,7 +287,6 @@ export default async function ClientFindPage({
                 </p>
             </div>
 
-            {/* Only the database-dependent part suspends */}
             <Suspense
                 key={JSON.stringify(params)}
                 fallback={<ContentLoading />}

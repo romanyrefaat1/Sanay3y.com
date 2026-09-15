@@ -74,6 +74,11 @@ export default async function JobDetailsPage({
 
     const supabase = await createClient();
 
+    /*
+     * Authentication is optional on this page.
+     * Guests can view the job, while authenticated users get
+     * additional actions depending on their relationship to it.
+     */
     const {
         data: { user },
     } = await supabase.auth.getUser();
@@ -100,11 +105,11 @@ export default async function JobDetailsPage({
                         </p>
 
                         <Link
-                            href="/dashboard"
+                            href="/craftsman/find"
                             className="mt-6 inline-block"
                         >
                             <Button>
-                                العودة للوحة التحكم
+                                العودة للشغلانات
                             </Button>
                         </Link>
                     </CardContent>
@@ -113,12 +118,19 @@ export default async function JobDetailsPage({
         );
     }
 
+    /*
+     * Only fetch public profile fields for the job owner.
+     *
+     * Do not fetch phone, private client data, etc.
+     */
     const { data: jobClient } = await supabase
         .from("profiles")
         .select(
-            "id, full_name, avatar_url, created_at",
+            "id, full_name, avatar_url, created_at"
         )
         .eq("id", job.client_id)
+        .eq("role", "client")
+        .eq("is_active", true)
         .single();
 
     const isOwner = user?.id === job.client_id;
@@ -131,6 +143,10 @@ export default async function JobDetailsPage({
             job.status as keyof typeof statusConfig
         ] ?? statusConfig.open;
 
+    /*
+     * Guests can see the job but cannot apply.
+     * Authentication is required for creating an application.
+     */
     const canApply =
         !!user &&
         !isOwner &&
@@ -260,7 +276,7 @@ export default async function JobDetailsPage({
 
                                         <p className="mt-1 text-base font-semibold">
                                             {job.budget.toLocaleString(
-                                                "ar-EG",
+                                                "ar-EG"
                                             )}{" "}
                                             جنيه
                                         </p>
@@ -291,7 +307,7 @@ export default async function JobDetailsPage({
 
                                         <p className="mt-1 text-sm font-medium">
                                             {formatDate(
-                                                job.created_at,
+                                                job.created_at
                                             )}
                                         </p>
                                     </div>
@@ -307,7 +323,7 @@ export default async function JobDetailsPage({
 
                                         <p className="mt-1 text-sm font-medium">
                                             {formatDate(
-                                                job.updated_at,
+                                                job.updated_at
                                             )}
                                         </p>
                                     </div>
@@ -400,7 +416,7 @@ export default async function JobDetailsPage({
                                         <p className="mt-1 text-xs text-muted-foreground">
                                             عضو منذ{" "}
                                             {formatDate(
-                                                jobClient.created_at,
+                                                jobClient.created_at
                                             )}
                                         </p>
                                     )}
@@ -457,14 +473,13 @@ export default async function JobDetailsPage({
                                     </Link>
                                 )}
 
-                                {canFinish &&
-                                    isOwner && (
-                                        <div className="mt-4">
-                                            <FinishJobButton
-                                                jobId={job.id}
-                                            />
-                                        </div>
-                                    )}
+                                {canFinish && isOwner && (
+                                    <div className="mt-4">
+                                        <FinishJobButton
+                                            jobId={job.id}
+                                        />
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -534,12 +549,16 @@ export default async function JobDetailsPage({
                     />
                 )}
 
-                <JobApplicationsList
-                    jobId={job.id}
-                    isOwner={isOwner}
-                    jobStatus={job.status}
-                    selectedCraftsmanId={job.selected_craftsman_id}
-                />
+                {isOwner && (
+                    <JobApplicationsList
+                        jobId={job.id}
+                        isOwner={isOwner}
+                        jobStatus={job.status}
+                        selectedCraftsmanId={
+                            job.selected_craftsman_id
+                        }
+                    />
+                )}
             </div>
         </div>
     );

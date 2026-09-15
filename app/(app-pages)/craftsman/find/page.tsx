@@ -27,10 +27,6 @@ async function CraftsmanFindContent({
         data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-        return null;
-    }
-
     const service = searchParams.service?.trim() || "";
     const area = searchParams.area?.trim() || "";
 
@@ -87,6 +83,7 @@ async function CraftsmanFindContent({
                 <p className="text-sm font-medium text-destructive">
                     حصل خطأ أثناء تحميل الشغلانات
                 </p>
+
                 <p className="mt-1 text-sm text-destructive/80">
                     جرب تحدّث الصفحة تاني
                 </p>
@@ -98,16 +95,30 @@ async function CraftsmanFindContent({
 
     let appliedJobIds = new Set<string>();
 
-    if (jobIds.length > 0) {
-        const { data: applications } = await supabase
-            .from("job_applications")
-            .select("job_id")
-            .eq("craftsman_id", user.id)
-            .in("job_id", jobIds);
+    /*
+     * Guests can browse jobs, but only authenticated craftsmen
+     * need to know which jobs they have already applied to.
+     */
+    if (user && jobIds.length > 0) {
+        const { data: applications, error: applicationsError } =
+            await supabase
+                .from("job_applications")
+                .select("job_id")
+                .eq("craftsman_id", user.id)
+                .in("job_id", jobIds);
 
-        appliedJobIds = new Set(
-            applications?.map((application) => application.job_id) ?? []
-        );
+        if (applicationsError) {
+            console.error(
+                "Failed to fetch application status:",
+                applicationsError
+            );
+        } else {
+            appliedJobIds = new Set(
+                applications?.map(
+                    (application) => application.job_id
+                ) ?? []
+            );
+        }
     }
 
     return (
@@ -129,10 +140,7 @@ async function CraftsmanFindContent({
 
 function Loading() {
     return (
-        <div
-             
-            className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
-        >
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
             <div className="space-y-3">
                 <div className="h-9 w-64 animate-pulse rounded-lg bg-muted" />
                 <div className="h-5 w-80 animate-pulse rounded-lg bg-muted" />
@@ -151,6 +159,7 @@ function Loading() {
 
             <div className="mt-8 flex flex-col gap-6 lg:flex-row-reverse">
                 <div className="h-64 w-full animate-pulse rounded-lg bg-muted lg:w-72" />
+
                 <div className="flex-1 space-y-4">
                     <div className="h-40 animate-pulse rounded-lg bg-muted" />
                     <div className="h-40 animate-pulse rounded-lg bg-muted" />
@@ -167,13 +176,13 @@ export default async function CraftsmanFindPage({
 
     return (
         <Suspense fallback={<Loading />}>
-            <main
-                className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6"
-            >
+            <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
                 <nav className="mb-3 flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <span>لوحة التحكم</span>
+                    <span>الرئيسية</span>
                     <span className="text-muted-foreground/50">‹</span>
-                    <span className="text-foreground">الشغلانات المتاحة</span>
+                    <span className="text-foreground">
+                        الشغلانات المتاحة
+                    </span>
                 </nav>
 
                 <div className="mb-8">

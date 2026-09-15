@@ -14,6 +14,7 @@ import {
     Wrench,
     XCircle,
 } from "lucide-react";
+import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 
 type ProfilePageProps = {
     params: Promise<{
@@ -52,6 +52,31 @@ type Review = {
         id: string;
         title: string;
     } | null;
+};
+
+type PublicCraftsmanProfile = {
+    bio: string | null;
+    experience_years: number | null;
+    areas: string[];
+    verification_status: string;
+    is_available: boolean;
+    average_response_time_minutes: number | null;
+    response_rate: number;
+    completion_rate: number;
+    work_type: string;
+};
+
+type PrivateCraftsmanProfile = {
+    phone: string | null;
+    shop_address: string | null;
+    temporary_area: string | null;
+    temporary_location_until: string | null;
+};
+
+type ClientProfile = {
+    area: string;
+    gender: string | null;
+    created_at: string;
 };
 
 const roleLabels = {
@@ -184,16 +209,20 @@ export default async function ProfilePage({
 
     const supabase = await createClient();
 
+    /*
+     * Authentication is optional.
+     *
+     * Guests can view public profiles.
+     * Authenticated users additionally get owner-only fields/actions.
+     */
     const {
         data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-        notFound();
-    }
-
     /*
-     * Base profile
+     * ============================================================
+     * BASE PROFILE
+     * ============================================================
      */
     const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -214,34 +243,48 @@ export default async function ProfilePage({
         notFound();
     }
 
+    /*
+     * Only client/craftsman profiles are rendered by the public
+     * profile UI. We keep the existing role support instead of
+     * breaking admin/team accounts completely.
+     */
     const isCraftsman = profile.role === "craftsman";
     const isClient = profile.role === "client";
     const isActive = profile.is_active;
-    const isOwnProfile = profile.id === user.id;
+    const isOwnProfile = !!user && profile.id === user.id;
 
     /*
-     * Role-specific profiles
+     * ============================================================
+     * ROLE-SPECIFIC DATA
+     * ============================================================
      */
-    let craftsman = null;
-    let client = null;
+
+    let craftsman: PublicCraftsmanProfile | null = null;
+    let craftsmanPrivate: PrivateCraftsmanProfile | null = null;
+    let client: ClientProfile | null = null;
 
     if (isCraftsman) {
+        /*
+         * Public craftsman fields only.
+         *
+         * Deliberately excludes:
+         * - phone
+         * - shop_address
+         * - temporary_area
+         * - temporary_location_until
+         */
         const { data, error } = await supabase
             .from("craftsman_profiles")
             .select(
                 `
-                phone,
                 bio,
                 experience_years,
                 areas,
-                shop_address,
                 verification_status,
                 is_available,
                 average_response_time_minutes,
                 response_rate,
                 completion_rate,
-                temporary_area,
-                temporary_location_until,
                 work_type
                 `,
             )
@@ -252,10 +295,55 @@ export default async function ProfilePage({
             notFound();
         }
 
-        craftsman = data;
+        craftsman = {
+            bio: data.bio ?? null,
+            experience_years: data.experience_years ?? null,
+            areas: data.areas ?? [],
+            verification_status: data.verification_status,
+            is_available: data.is_available ?? false,
+            average_response_time_minutes:
+                data.average_response_time_minutes ?? null,
+            response_rate: Number(data.response_rate ?? 0),
+            completion_rate: Number(data.completion_rate ?? 0),
+            work_type: data.work_type ?? "أخرى",
+        };
+
+        /*
+         * Private fields are only fetched when viewing your own profile.
+         * This keeps the existing "مكان العمل" UI working for the owner
+         * without exposing exact/private location information publicly.
+         */
+        if (isOwnProfile) {
+            const { data: privateData, error: privateError } =
+                await supabase
+                    .from("craftsman_profiles")
+                    .select(
+                        `
+                        phone,
+                        shop_address,
+                        temporary_area,
+                        temporary_location_until
+                        `,
+                    )
+                    .eq("id", id)
+                    .maybeSingle();
+
+            if (privateError) {
+                console.error(
+                    "Failed to fetch private craftsman profile:",
+                    privateError,
+                );
+            } else if (privateData) {
+                craftsmanPrivate = privateData;
+            }
+        }
     }
 
     if (isClient) {
+        /*
+         * Client profile fields that are safe for the public profile.
+         * Phone is intentionally not selected.
+         */
         const { data, error } = await supabase
             .from("client_profiles")
             .select(
@@ -272,21 +360,32 @@ export default async function ProfilePage({
             notFound();
         }
 
-        client = data;
+        client = {
+            area: data.area,
+            gender: data.gender,
+            created_at: data.created_at,
+        };
     }
 
     /*
-     * Craftsman data
+     * ============================================================
+     * CRAFTSMAN DATA
+     * ============================================================
      */
+
     let craftsmanReviews: Review[] = [];
     let completedJobs = 0;
 
     /*
-     * Client data
+     * ============================================================
+     * CLIENT DATA
+     * ============================================================
      */
+
     let clientTotalJobs = 0;
     let clientCompletedJobs = 0;
     let clientActiveJobs = 0;
+
     let clientRecentJobs: {
         id: string;
         title: string;
@@ -296,6 +395,7 @@ export default async function ProfilePage({
         created_at: string;
         selected_craftsman_id: string | null;
     }[] = [];
+
     let clientReviews: Review[] = [];
 
     /*
@@ -303,26 +403,32 @@ export default async function ProfilePage({
      * CRAFTSMAN DATA
      * ============================================================
      */
+
     if (isCraftsman) {
         /*
          * Only completed jobs where this craftsman was selected
          * count toward the rating threshold.
          */
-        const { count: completedJobsCount, error: completedJobsError } =
-            await supabase
-                .from("jobs")
-                .select("id", {
-                    count: "exact",
-                    head: true,
-                })
-                .eq("selected_craftsman_id", id)
-                .eq("status", "completed");
+        const {
+            count: completedJobsCount,
+            error: completedJobsError,
+        } = await supabase
+            .from("jobs")
+            .select("id", {
+                count: "exact",
+                head: true,
+            })
+            .eq("selected_craftsman_id", id)
+            .eq("status", "completed");
 
         if (completedJobsError) {
-            notFound();
+            console.error(
+                "Failed to count craftsman completed jobs:",
+                completedJobsError,
+            );
+        } else {
+            completedJobs = completedJobsCount ?? 0;
         }
-
-        completedJobs = completedJobsCount ?? 0;
 
         /*
          * Reviews received by this craftsman.
@@ -347,58 +453,64 @@ export default async function ProfilePage({
             .order("created_at", { ascending: false });
 
         if (reviewsError) {
-            notFound();
+            console.error(
+                "Failed to fetch craftsman reviews:",
+                reviewsError,
+            );
+        } else {
+            const rows = reviewRows ?? [];
+
+            const reviewerIds = [
+                ...new Set(rows.map((review) => review.reviewer_id)),
+            ];
+
+            const jobIds = [
+                ...new Set(rows.map((review) => review.job_id)),
+            ];
+
+            const [{ data: reviewers }, { data: jobs }] =
+                await Promise.all([
+                    reviewerIds.length
+                        ? supabase
+                              .from("profiles")
+                              .select(
+                                  "id, full_name, avatar_url",
+                              )
+                              .in("id", reviewerIds)
+                        : Promise.resolve({ data: [] }),
+
+                    jobIds.length
+                        ? supabase
+                              .from("jobs")
+                              .select("id, title")
+                              .in("id", jobIds)
+                        : Promise.resolve({ data: [] }),
+                ]);
+
+            const reviewerMap = new Map(
+                (reviewers ?? []).map((reviewer) => [
+                    reviewer.id,
+                    reviewer,
+                ]),
+            );
+
+            const jobMap = new Map(
+                (jobs ?? []).map((job) => [job.id, job]),
+            );
+
+            craftsmanReviews = rows.map((review) => ({
+                id: review.id,
+                work_rating: review.work_rating,
+                respect_rating: review.respect_rating,
+                client_experience: review.client_experience,
+                issue_type: review.issue_type,
+                comment: review.comment,
+                created_at: review.created_at,
+                reviewer:
+                    reviewerMap.get(review.reviewer_id) ?? null,
+                job: jobMap.get(review.job_id) ?? null,
+            }));
         }
-
-        const rows = reviewRows ?? [];
-
-        const reviewerIds = [
-            ...new Set(rows.map((review) => review.reviewer_id)),
-        ];
-
-        const jobIds = [
-            ...new Set(rows.map((review) => review.job_id)),
-        ];
-
-        const [{ data: reviewers }, { data: jobs }] = await Promise.all([
-            reviewerIds.length
-                ? supabase
-                      .from("profiles")
-                      .select("id, full_name, avatar_url")
-                      .in("id", reviewerIds)
-                : Promise.resolve({ data: [] }),
-
-            jobIds.length
-                ? supabase
-                      .from("jobs")
-                      .select("id, title")
-                      .in("id", jobIds)
-                : Promise.resolve({ data: [] }),
-        ]);
-
-        const reviewerMap = new Map(
-            (reviewers ?? []).map((reviewer) => [
-                reviewer.id,
-                reviewer,
-            ]),
-        );
-
-        const jobMap = new Map(
-            (jobs ?? []).map((job) => [job.id, job]),
-        );
-
-        craftsmanReviews = rows.map((review) => ({
-            id: review.id,
-            work_rating: review.work_rating,
-            respect_rating: review.respect_rating,
-            client_experience: review.client_experience,
-            issue_type: review.issue_type,
-            comment: review.comment,
-            created_at: review.created_at,
-            reviewer:
-                reviewerMap.get(review.reviewer_id) ?? null,
-            job: jobMap.get(review.job_id) ?? null,
-        }));
     }
 
     /*
@@ -406,6 +518,7 @@ export default async function ProfilePage({
      * CLIENT DATA
      * ============================================================
      */
+
     if (isClient) {
         const [
             { count: totalJobs },
@@ -485,64 +598,70 @@ export default async function ProfilePage({
                 }),
         ]);
 
-        if (reviewsError) {
-            notFound();
-        }
-
         clientTotalJobs = totalJobs ?? 0;
         clientCompletedJobs = completedJobsCount ?? 0;
         clientActiveJobs = activeJobsCount ?? 0;
         clientRecentJobs = recentJobs ?? [];
 
-        const rows = reviewRows ?? [];
+        if (reviewsError) {
+            console.error(
+                "Failed to fetch client reviews:",
+                reviewsError,
+            );
+        } else {
+            const rows = reviewRows ?? [];
 
-        const reviewerIds = [
-            ...new Set(rows.map((review) => review.reviewer_id)),
-        ];
+            const reviewerIds = [
+                ...new Set(rows.map((review) => review.reviewer_id)),
+            ];
 
-        const jobIds = [
-            ...new Set(rows.map((review) => review.job_id)),
-        ];
+            const jobIds = [
+                ...new Set(rows.map((review) => review.job_id)),
+            ];
 
-        const [{ data: reviewers }, { data: jobs }] = await Promise.all([
-            reviewerIds.length
-                ? supabase
-                      .from("profiles")
-                      .select("id, full_name, avatar_url")
-                      .in("id", reviewerIds)
-                : Promise.resolve({ data: [] }),
+            const [{ data: reviewers }, { data: jobs }] =
+                await Promise.all([
+                    reviewerIds.length
+                        ? supabase
+                              .from("profiles")
+                              .select(
+                                  "id, full_name, avatar_url",
+                              )
+                              .in("id", reviewerIds)
+                        : Promise.resolve({ data: [] }),
 
-            jobIds.length
-                ? supabase
-                      .from("jobs")
-                      .select("id, title")
-                      .in("id", jobIds)
-                : Promise.resolve({ data: [] }),
-        ]);
+                    jobIds.length
+                        ? supabase
+                              .from("jobs")
+                              .select("id, title")
+                              .in("id", jobIds)
+                        : Promise.resolve({ data: [] }),
+                ]);
 
-        const reviewerMap = new Map(
-            (reviewers ?? []).map((reviewer) => [
-                reviewer.id,
-                reviewer,
-            ]),
-        );
+            const reviewerMap = new Map(
+                (reviewers ?? []).map((reviewer) => [
+                    reviewer.id,
+                    reviewer,
+                ]),
+            );
 
-        const jobMap = new Map(
-            (jobs ?? []).map((job) => [job.id, job]),
-        );
+            const jobMap = new Map(
+                (jobs ?? []).map((job) => [job.id, job]),
+            );
 
-        clientReviews = rows.map((review) => ({
-            id: review.id,
-            work_rating: review.work_rating,
-            respect_rating: review.respect_rating,
-            client_experience: review.client_experience,
-            issue_type: review.issue_type,
-            comment: review.comment,
-            created_at: review.created_at,
-            reviewer:
-                reviewerMap.get(review.reviewer_id) ?? null,
-            job: jobMap.get(review.job_id) ?? null,
-        }));
+            clientReviews = rows.map((review) => ({
+                id: review.id,
+                work_rating: review.work_rating,
+                respect_rating: review.respect_rating,
+                client_experience: review.client_experience,
+                issue_type: review.issue_type,
+                comment: review.comment,
+                created_at: review.created_at,
+                reviewer:
+                    reviewerMap.get(review.reviewer_id) ?? null,
+                job: jobMap.get(review.job_id) ?? null,
+            }));
+        }
     }
 
     /*
@@ -571,8 +690,10 @@ export default async function ProfilePage({
 
     const averageWorkRating =
         workRatings.length > 0
-            ? workRatings.reduce((sum, rating) => sum + rating, 0) /
-              workRatings.length
+            ? workRatings.reduce(
+                  (sum, rating) => sum + rating,
+                  0,
+              ) / workRatings.length
             : null;
 
     const averageRespectRating =
@@ -584,8 +705,7 @@ export default async function ProfilePage({
             : null;
 
     /*
-     * Craftsman overall rating is intentionally hidden until
-     * the craftsman completes 5 jobs.
+     * Craftsman overall rating is hidden until 5 completed jobs.
      */
     const canShowOverallRating =
         isCraftsman &&
@@ -602,10 +722,12 @@ export default async function ProfilePage({
         craftsman?.is_available === true;
 
     const hasTemporaryLocation =
-        isCraftsman &&
-        !!craftsman?.temporary_area &&
-        !!craftsman?.temporary_location_until &&
-        new Date(craftsman.temporary_location_until) > new Date();
+        isOwnProfile &&
+        !!craftsmanPrivate?.temporary_area &&
+        !!craftsmanPrivate?.temporary_location_until &&
+        new Date(
+            craftsmanPrivate.temporary_location_until,
+        ) > new Date();
 
     const clientStatusLabel = {
         open: "مفتوح",
@@ -746,9 +868,9 @@ export default async function ProfilePage({
                                 ) : null}
                             </div>
 
-                            {profile.id !== user.id &&
-                                isCraftsman &&
-                                isActive && (
+                            {isCraftsman &&
+                                isActive &&
+                                profile.id !== user?.id && (
                                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
                                         <Link
                                             href={`/client/job/new?craftsman=${id}`}
@@ -782,7 +904,6 @@ export default async function ProfilePage({
 
                                     <CardContent>
                                         <div className="grid grid-cols-2 divide-x divide-x-reverse md:grid-cols-5">
-                                            {/* Rating */}
                                             <div className="px-4 text-center first:pr-0">
                                                 {canShowOverallRating &&
                                                 averageWorkRating !==
@@ -819,7 +940,6 @@ export default async function ProfilePage({
                                                 )}
                                             </div>
 
-                                            {/* Completed */}
                                             <div className="px-4 text-center">
                                                 <p className="text-2xl font-bold">
                                                     {completedJobs}
@@ -830,7 +950,6 @@ export default async function ProfilePage({
                                                 </p>
                                             </div>
 
-                                            {/* Reviews */}
                                             <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
                                                 <p className="text-2xl font-bold">
                                                     {
@@ -843,7 +962,6 @@ export default async function ProfilePage({
                                                 </p>
                                             </div>
 
-                                            {/* Completion */}
                                             <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
                                                 <p className="text-lg font-bold">
                                                     {
@@ -857,7 +975,6 @@ export default async function ProfilePage({
                                                 </p>
                                             </div>
 
-                                            {/* Response */}
                                             <div className="mt-6 border-t px-4 pt-6 text-center md:mt-0 md:border-t-0 md:pt-0">
                                                 <p className="text-lg font-bold">
                                                     {
@@ -948,60 +1065,61 @@ export default async function ProfilePage({
                                     </Card>
                                 ) : null}
 
-                                {/* Location */}
-                                {craftsman.shop_address && (
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>
-                                                مكان العمل
-                                            </CardTitle>
-                                        </CardHeader>
+                                {/* Private location / owner-only */}
+                                {isOwnProfile &&
+                                    craftsmanPrivate?.shop_address && (
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle>
+                                                    مكان العمل
+                                                </CardTitle>
+                                            </CardHeader>
 
-                                        <CardContent>
-                                            <div className="flex items-start gap-3">
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                                                    <MapPin className="h-5 w-5" />
-                                                </div>
-
-                                                <div>
-                                                    <p className="font-medium">
-                                                        عنوان المحل
-                                                    </p>
-
-                                                    <p className="mt-1 text-muted-foreground">
-                                                        {
-                                                            craftsman.shop_address
-                                                        }
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {hasTemporaryLocation && (
-                                                <>
-                                                    <Separator className="my-5" />
-
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
-                                                            <MapPin className="h-5 w-5" />
-                                                        </div>
-
-                                                        <div>
-                                                            <p className="font-medium">
-                                                                متواجد مؤقتًا في
-                                                            </p>
-
-                                                            <p className="mt-1 text-muted-foreground">
-                                                                {
-                                                                    craftsman.temporary_area
-                                                                }
-                                                            </p>
-                                                        </div>
+                                            <CardContent>
+                                                <div className="flex items-start gap-3">
+                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                                                        <MapPin className="h-5 w-5" />
                                                     </div>
-                                                </>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                )}
+
+                                                    <div>
+                                                        <p className="font-medium">
+                                                            عنوان المحل
+                                                        </p>
+
+                                                        <p className="mt-1 text-muted-foreground">
+                                                            {
+                                                                craftsmanPrivate.shop_address
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {hasTemporaryLocation && (
+                                                    <>
+                                                        <Separator className="my-5" />
+
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-warning/10 text-warning">
+                                                                <MapPin className="h-5 w-5" />
+                                                            </div>
+
+                                                            <div>
+                                                                <p className="font-medium">
+                                                                    متواجد مؤقتًا في
+                                                                </p>
+
+                                                                <p className="mt-1 text-muted-foreground">
+                                                                    {
+                                                                        craftsmanPrivate.temporary_area
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
 
                                 {/* Reviews */}
                                 <Card>
@@ -1708,7 +1826,6 @@ export default async function ProfilePage({
                         {/* Client sidebar */}
                         {isClient && client && (
                             <>
-                                {/* Client Account */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>
@@ -1776,7 +1893,6 @@ export default async function ProfilePage({
                                     </CardContent>
                                 </Card>
 
-                                {/* Client Reputation */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>

@@ -1,41 +1,115 @@
-import { MetadataRoute } from 'next';
+import { MetadataRoute } from "next";
+import { createClient } from "@/lib/supabase/server";
 
 const baseUrl = process.env.APP_URL
-  ? `https://${process.env.APP_URL}`
-  : 'http://localhost:3000';
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : "http://localhost:3000";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Static routes
-  const staticRoutes = [
-    '',
-    '/profile',
-    '/client/find',
-    '/craftsman/find',
-    '/client/auth/login',
-    '/client/auth/sign-up',
-    '/craftsman/auth/login',
-    '/craftsman/auth/sign-up',
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date().toISOString(),
-    changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
-  }));
+    const supabase = await createClient();
 
-  // Dynamic routes — e.g. job listings from /jobs/[id]
-  // Replace this with a real DB/API call
-  const jobs = await getJobs(); // your fetch logic here
-  const jobRoutes = jobs.map((job: { id: string; updatedAt: string }) => ({
-    url: `${baseUrl}/jobs/${job.id}`,
-    lastModified: job.updatedAt,
-    changeFrequency: 'daily' as const,
-    priority: 0.8,
-  }));
+    /*
+     * ============================================================
+     * STATIC PUBLIC ROUTES
+     * ============================================================
+     */
 
-  return [...staticRoutes, ...jobRoutes];
-}
+    const staticRoutes: MetadataRoute.Sitemap = [
+        {
+            url: baseUrl,
+            lastModified: new Date(),
+            changeFrequency: "weekly",
+            priority: 1,
+        },
+        {
+            url: `${baseUrl}/client/find`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.9,
+        },
+        {
+            url: `${baseUrl}/craftsman/find`,
+            lastModified: new Date(),
+            changeFrequency: "daily",
+            priority: 0.9,
+        },
+    ];
 
-// placeholder — swap with your actual data fetching (Supabase, etc.)
-async function getJobs() {
-  return [];
+    /*
+     * ============================================================
+     * PUBLIC PROFILES
+     *
+     * Include active clients and craftsmen only.
+     * Admin/team profiles are excluded.
+     * ============================================================
+     */
+
+    const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, role, updated_at")
+        .eq("is_active", true)
+        .in("role", ["client", "craftsman"]);
+
+    if (profilesError) {
+        console.error(
+            "Failed to fetch profiles for sitemap:",
+            profilesError,
+        );
+    }
+
+    const profileRoutes: MetadataRoute.Sitemap = (profiles ?? []).map(
+        (profile) => ({
+            url: `${baseUrl}/profile/${profile.id}`,
+            lastModified: profile.updated_at
+                ? new Date(profile.updated_at)
+                : new Date(),
+            changeFrequency: "weekly" as const,
+            priority: profile.role === "craftsman" ? 0.8 : 0.6,
+        }),
+    );
+
+    /*
+     * ============================================================
+     * PUBLIC JOBS
+     *
+     * Only index jobs that are intended to be publicly discoverable.
+     * Open jobs are the strongest candidates for SEO.
+     * ============================================================
+     */
+
+    const { data: jobs, error: jobsError } = await supabase
+        .from("jobs")
+        .select("id, updated_at, status")
+        .in("status", [
+            "open",
+            "in_progress",
+            "completed",
+        ]);
+
+    if (jobsError) {
+        console.error(
+            "Failed to fetch jobs for sitemap:",
+            jobsError,
+        );
+    }
+
+    const jobRoutes: MetadataRoute.Sitemap = (jobs ?? []).map(
+        (job) => ({
+            url: `${baseUrl}/jobs/${job.id}`,
+            lastModified: job.updated_at
+                ? new Date(job.updated_at)
+                : new Date(),
+            changeFrequency:
+                job.status === "open"
+                    ? ("daily" as const)
+                    : ("weekly" as const),
+            priority: job.status === "open" ? 0.8 : 0.6,
+        }),
+    );
+
+    return [
+        ...staticRoutes,
+        ...profileRoutes,
+        ...jobRoutes,
+    ];
 }
