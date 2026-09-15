@@ -1,5 +1,6 @@
 import { ClientNavbar } from "@/components/app/client-navbar";
 import { CraftsmanNavbar } from "@/components/app/craftsman-navbar";
+import { GuestNavbar } from "@/components/app/guest-navbar";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppRoutesLayout({
@@ -35,7 +36,9 @@ export default async function AppRoutesLayout({
           <CraftsmanNavbar />
         ) : role === "client" ? (
           <ClientNavbar />
-        ) : null}
+        ) : (
+          <GuestNavbar />
+        )}
       </div>
 
       {/* pb-20 reserves space so the mobile bottom nav never covers content */}
