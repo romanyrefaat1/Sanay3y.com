@@ -54,10 +54,12 @@ export async function updateSession(request: NextRequest) {
   !request.nextUrl.pathname.startsWith("/craftsman/auth/sign-up") &&
   !request.nextUrl.pathname.startsWith("/client/auth/sign-up") &&
   !request.nextUrl.pathname.startsWith("/api/telegram") && 
-  !request.nextUrl.pathname.startsWith("/jobs") &&
+  !request.nextUrl.pathname.startsWith("/jobs/") &&
   !request.nextUrl.pathname.startsWith("/craftsman/find") &&
   !request.nextUrl.pathname.startsWith("/client/find") &&
-  !request.nextUrl.pathname.startsWith("/profile/")
+  !request.nextUrl.pathname.startsWith("/profile/") &&
+  !request.nextUrl.pathname.startsWith("/sitemap.xml") &&
+  !request.nextUrl.pathname.startsWith("/robots.txt")
 ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
