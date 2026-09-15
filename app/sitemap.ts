@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
 
 const baseUrl = process.env.APP_URL
-    ? process.env.APP_URL.replace(/\/$/, "")
+    ? process.env.NEXT_PUBLIC_APP_URL_FULL.replace(/\/$/, "")
     : "http://localhost:3000";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
