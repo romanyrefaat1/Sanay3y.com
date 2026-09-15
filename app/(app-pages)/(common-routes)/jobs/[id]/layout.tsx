@@ -11,7 +11,7 @@ type Props = {
 };
 
 const SITE_URL =
-    process.env.NEXT_PUBLIC_SITE_URL || "https://san3y.vercel.app";
+    process.env.NEXT_PUBLIC_APP_URL_FULL || "https://san3y.vercel.app";
 
 const DEFAULT_JOB_IMAGE = `${SITE_URL}/og-image.jpg`;
 

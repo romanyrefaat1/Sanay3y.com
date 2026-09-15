@@ -25,10 +25,15 @@ import { Separator } from "@/components/ui/separator";
 import JobApplicationForm from "@/components/jobs/job-application-form";
 import { JobApplicationsList } from "@/components/jobs/job-applications-list";
 import { FinishJobButton } from "@/components/jobs/finish-job-button";
+import { ApplicationScrollHandler } from "./(components)/application-scroll-handler";
 
 type PageProps = {
     params: Promise<{
         id: string;
+    }>;
+
+    searchParams: Promise<{
+        applicationId?: string;
     }>;
 };
 
@@ -62,8 +67,10 @@ const formatDate = (date: string) =>
 
 export default async function JobDetailsPage({
     params,
+    searchParams,
 }: PageProps) {
     const { id } = await params;
+    const { applicationId } = await searchParams;
 
     const supabase = await createClient();
 
@@ -140,6 +147,10 @@ export default async function JobDetailsPage({
 
     return (
         <div className="mx-auto w-full max-w-6xl px-4 py-6">
+            <ApplicationScrollHandler
+                applicationId={applicationId}
+            />
+
             {/* Header */}
             <div className="mb-6">
                 <Link
@@ -369,7 +380,8 @@ export default async function JobDetailsPage({
                                                 jobClient.avatar_url
                                             }
                                             alt={
-                                                jobClient.full_name
+                                                jobClient.full_name ??
+                                                "صاحب الشغلانة"
                                             }
                                             className="size-full object-cover"
                                         />
