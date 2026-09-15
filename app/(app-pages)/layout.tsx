@@ -34,7 +34,10 @@ export default async function AppRoutesLayout({
         <CraftsmanNavbar />
       ) : role === "client" ? (
         <ClientNavbar />
-      ) : null /* Anonymous, admin, team*/}
+      ) : !role ? (
+        
+      ) /* Anonymous, admin, team*/
+      }
       </div>
 
       {/* pb-20 reserves space so the mobile bottom nav never covers content, only matters once a navbar renders */}
