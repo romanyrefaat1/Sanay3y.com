@@ -13,8 +13,6 @@ export default async function AppRoutesLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Anonymous visitors can land here on public pages — proxy.ts already
-  // gates the private ones, so we just render without a role-based navbar. this fixes the bug of user possibly null
   let role: "client" | "craftsman" | "admin" | "team" | null = null;
 
   if (user) {
@@ -28,20 +26,22 @@ export default async function AppRoutesLayout({
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "hsl(var(--background))" }}>
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: "hsl(var(--background))" }}
+    >
       <div className="sticky top-0 z-99999999999">
         {role === "craftsman" ? (
-        <CraftsmanNavbar />
-      ) : role === "client" ? (
-        <ClientNavbar />
-      ) : !role ? (
-        
-      ) /* Anonymous, admin, team*/
-      }
+          <CraftsmanNavbar />
+        ) : role === "client" ? (
+          <ClientNavbar />
+        ) : null}
       </div>
 
-      {/* pb-20 reserves space so the mobile bottom nav never covers content, only matters once a navbar renders */}
-      <main className={role ? "pb-20 md:pb-0" : undefined}>{children}</main>
+      {/* pb-20 reserves space so the mobile bottom nav never covers content */}
+      <main className={role ? "pb-20 md:pb-0" : undefined}>
+        {children}
+      </main>
     </div>
   );
 }
