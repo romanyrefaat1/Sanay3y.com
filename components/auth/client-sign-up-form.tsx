@@ -129,7 +129,7 @@ export function ClientSignupForm() {
       return;
     }
 
-    router.push("/confirm");
+    router.push("/auth/login");
   }
 
   return (

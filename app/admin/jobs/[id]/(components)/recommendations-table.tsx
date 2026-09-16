@@ -1,10 +1,8 @@
 "use client";
 
-import { markCraftsmanCalled, unmarkCraftsmanCalled } from "@/app/admin/actions";
 import {
   Check,
   CheckCircle2,
-  MessageCircle,
   Phone,
   PhoneCall,
   RotateCcw,
@@ -14,6 +12,10 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import {
+  markCraftsmanCalled,
+  unmarkCraftsmanCalled,
+} from "@/app/admin/actions";
 
 type Recommendation = {
   recommendation_id: string;
@@ -25,15 +27,19 @@ type Recommendation = {
   is_active: boolean;
   is_available: boolean;
   verification_status: string | null;
+
   telegram_connected: boolean;
   telegram_connected_at: string | null;
   telegram_connected_after_job: boolean;
   notification_status: string | null;
   telegram_notified: boolean;
+
   called: boolean;
   called_at: string | null;
+
   applied: boolean;
   application_status: string | null;
+
   recommendation_status: string | null;
 };
 
@@ -47,66 +53,6 @@ type Filter =
   | "applied"
   | "not_applied";
 
-function formatDistance(distanceKm: number | null) {
-  if (distanceKm == null) return "—";
-  if (distanceKm < 1) {
-    return `${Math.round(distanceKm * 1000)} م`;
-  }
-
-  return `${distanceKm.toFixed(2)} كم`;
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-
-  return new Intl.DateTimeFormat("ar-EG", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function getApplicationLabel(
-  applied: boolean,
-  status: string | null,
-) {
-  if (!applied) return "لم يتقدم";
-
-  switch (status) {
-    case "pending":
-      return "متقدم";
-    case "accepted":
-      return "تم قبوله";
-    case "rejected":
-      return "مرفوض";
-    case "withdrawn":
-      return "منسحب";
-    default:
-      return "متقدم";
-  }
-}
-
-function getNotificationLabel(
-  recommendation: Recommendation,
-) {
-  if (recommendation.telegram_connected_after_job) {
-    return "اتصل بعد نشر الشغل";
-  }
-
-  if (recommendation.telegram_notified) {
-    return "تم الإرسال";
-  }
-
-  if (recommendation.notification_status === "failed") {
-    return "فشل الإرسال";
-  }
-
-  if (recommendation.telegram_connected) {
-    return "متصل بتيليجرام";
-  }
-
-  return "بدون تيليجرام";
-}
-
 export default function RecommendationsTable({
   jobId,
   recommendations,
@@ -114,33 +60,61 @@ export default function RecommendationsTable({
   jobId: string;
   recommendations: Recommendation[];
 }) {
-  const [filter, setFilter] = useState<Filter>("needs_call");
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [filter, setFilter] =
+    useState<Filter>("all");
 
-  const counts = useMemo(() => {
-    return {
+  const [pendingId, setPendingId] =
+    useState<string | null>(null);
+
+  const counts = useMemo(
+    () => ({
       all: recommendations.length,
+
       needs_call: recommendations.filter(
-        (r) => !r.called && !r.telegram_notified,
+        (r) =>
+          !r.called &&
+          !r.telegram_notified &&
+          !r.applied,
       ).length,
-      not_called: recommendations.filter((r) => !r.called).length,
-      called: recommendations.filter((r) => r.called).length,
+
+      not_called: recommendations.filter(
+        (r) => !r.called,
+      ).length,
+
+      called: recommendations.filter(
+        (r) => r.called,
+      ).length,
+
       telegram: recommendations.filter(
-        (r) => r.telegram_connected && !r.telegram_connected_after_job,
+        (r) =>
+          r.telegram_connected &&
+          !r.telegram_connected_after_job,
       ).length,
+
       not_telegram: recommendations.filter(
         (r) => !r.telegram_connected,
       ).length,
-      applied: recommendations.filter((r) => r.applied).length,
-      not_applied: recommendations.filter((r) => !r.applied).length,
-    };
-  }, [recommendations]);
+
+      applied: recommendations.filter(
+        (r) => r.applied,
+      ).length,
+
+      not_applied: recommendations.filter(
+        (r) => !r.applied,
+      ).length,
+    }),
+    [recommendations],
+  );
 
   const filtered = useMemo(() => {
     return recommendations.filter((r) => {
       switch (filter) {
         case "needs_call":
-          return !r.called && !r.telegram_notified;
+          return (
+            !r.called &&
+            !r.telegram_notified &&
+            !r.applied
+          );
 
         case "not_called":
           return !r.called;
@@ -171,16 +145,17 @@ export default function RecommendationsTable({
   }, [filter, recommendations]);
 
   async function handleCalled(
-    recommendation: Recommendation,
+    recommendationId: string,
   ) {
-    setPendingId(recommendation.recommendation_id);
+    setPendingId(recommendationId);
 
     try {
       const formData = new FormData();
+
       formData.set("jobId", jobId);
       formData.set(
         "recommendationId",
-        recommendation.recommendation_id,
+        recommendationId,
       );
 
       await markCraftsmanCalled(formData);
@@ -190,16 +165,17 @@ export default function RecommendationsTable({
   }
 
   async function handleUnmark(
-    recommendation: Recommendation,
+    recommendationId: string,
   ) {
-    setPendingId(recommendation.recommendation_id);
+    setPendingId(recommendationId);
 
     try {
       const formData = new FormData();
+
       formData.set("jobId", jobId);
       formData.set(
         "recommendationId",
-        recommendation.recommendation_id,
+        recommendationId,
       );
 
       await unmarkCraftsmanCalled(formData);
@@ -213,12 +189,16 @@ export default function RecommendationsTable({
     label: string;
   }[] = [
     {
-      id: "needs_call",
-      label: `يحتاج اتصال (${counts.needs_call})`,
-    },
-    {
       id: "all",
       label: `الكل (${counts.all})`,
+    },
+    {
+      id: "applied",
+      label: `تقدموا (${counts.applied})`,
+    },
+    {
+      id: "needs_call",
+      label: `يحتاج اتصال (${counts.needs_call})`,
     },
     {
       id: "not_called",
@@ -235,10 +215,6 @@ export default function RecommendationsTable({
     {
       id: "not_telegram",
       label: `بدون تيليجرام (${counts.not_telegram})`,
-    },
-    {
-      id: "applied",
-      label: `تقدموا (${counts.applied})`,
     },
     {
       id: "not_applied",
@@ -268,24 +244,29 @@ export default function RecommendationsTable({
 
       <div className="overflow-hidden border border-border">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+          <table className="w-full min-w-[1150px] text-sm">
             <thead className="border-b border-border bg-muted/40">
               <tr className="text-right">
                 <th className="px-4 py-3 font-medium">
                   الصنايعي
                 </th>
+
                 <th className="px-4 py-3 font-medium">
                   المطابقة
                 </th>
+
                 <th className="px-4 py-3 font-medium">
                   الحساب
                 </th>
+
                 <th className="px-4 py-3 font-medium">
-                  تيليجرام
+                  Telegram
                 </th>
+
                 <th className="px-4 py-3 font-medium">
-                  التقدم
+                  التقديم
                 </th>
+
                 <th className="px-4 py-3 font-medium">
                   الاتصال
                 </th>
@@ -295,13 +276,20 @@ export default function RecommendationsTable({
             <tbody>
               {filtered.map((recommendation) => {
                 const isPending =
-                  pendingId === recommendation.recommendation_id;
+                  pendingId ===
+                  recommendation.recommendation_id;
 
                 return (
                   <tr
                     key={recommendation.recommendation_id}
-                    className="border-b border-border last:border-b-0"
+                    className={[
+                      "border-b border-border last:border-b-0",
+                      recommendation.applied
+                        ? "bg-muted/20"
+                        : "",
+                    ].join(" ")}
                   >
+                    {/* Craftsman */}
                     <td className="px-4 py-4">
                       <div className="flex items-start gap-3">
                         <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-muted">
@@ -315,7 +303,8 @@ export default function RecommendationsTable({
                           </div>
 
                           <div className="mt-1 text-xs text-muted-foreground">
-                            {recommendation.work_type || "—"}
+                            {recommendation.work_type ||
+                              "—"}
                           </div>
 
                           {recommendation.phone && (
@@ -330,6 +319,7 @@ export default function RecommendationsTable({
                       </div>
                     </td>
 
+                    {/* Match */}
                     <td className="px-4 py-4">
                       <div className="space-y-1">
                         <div className="font-medium">
@@ -346,6 +336,7 @@ export default function RecommendationsTable({
                       </div>
                     </td>
 
+                    {/* Account */}
                     <td className="px-4 py-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
@@ -357,7 +348,7 @@ export default function RecommendationsTable({
                           ) : (
                             <>
                               <X className="size-4" />
-                              <span>غير نشط</span>
+                              <span>موقوف</span>
                             </>
                           )}
                         </div>
@@ -370,11 +361,13 @@ export default function RecommendationsTable({
                       </div>
                     </td>
 
+                    {/* Telegram */}
                     <td className="px-4 py-4">
                       <div className="space-y-1">
                         {recommendation.telegram_connected ? (
                           <div className="flex items-center gap-2">
                             <Send className="size-4" />
+
                             <span>
                               {getNotificationLabel(
                                 recommendation,
@@ -382,9 +375,9 @@ export default function RecommendationsTable({
                             </span>
                           </div>
                         ) : (
-                          <div className="text-muted-foreground">
+                          <span className="text-muted-foreground">
                             بدون تيليجرام
-                          </div>
+                          </span>
                         )}
 
                         {recommendation.telegram_connected_at && (
@@ -397,17 +390,14 @@ export default function RecommendationsTable({
                       </div>
                     </td>
 
+                    {/* Application */}
                     <td className="px-4 py-4">
                       {recommendation.applied ? (
-                        <div className="flex items-center gap-2">
-                          <Check className="size-4" />
-                          <span>
-                            {getApplicationLabel(
-                              true,
-                              recommendation.application_status,
-                            )}
-                          </span>
-                        </div>
+                        <ApplicationStatus
+                          status={
+                            recommendation.application_status
+                          }
+                        />
                       ) : (
                         <span className="text-muted-foreground">
                           لم يتقدم
@@ -415,6 +405,7 @@ export default function RecommendationsTable({
                       )}
                     </td>
 
+                    {/* Call */}
                     <td className="px-4 py-4">
                       {recommendation.called ? (
                         <div className="flex flex-wrap items-center gap-2">
@@ -427,7 +418,9 @@ export default function RecommendationsTable({
                             type="button"
                             disabled={isPending}
                             onClick={() =>
-                              handleUnmark(recommendation)
+                              handleUnmark(
+                                recommendation.recommendation_id,
+                              )
                             }
                             className="inline-flex items-center gap-1 border border-border px-2 py-1 text-xs hover:bg-muted disabled:opacity-50"
                           >
@@ -440,6 +433,7 @@ export default function RecommendationsTable({
                           {recommendation.phone && (
                             <a
                               href={`tel:${recommendation.phone}`}
+                              aria-label={`الاتصال بـ ${recommendation.full_name ?? "الصنايعي"}`}
                               className="inline-flex items-center gap-2 border border-border px-3 py-2 hover:bg-muted"
                             >
                               <Phone className="size-4" />
@@ -451,7 +445,9 @@ export default function RecommendationsTable({
                             type="button"
                             disabled={isPending}
                             onClick={() =>
-                              handleCalled(recommendation)
+                              handleCalled(
+                                recommendation.recommendation_id,
+                              )
                             }
                             className="inline-flex items-center gap-2 border border-primary bg-primary px-3 py-2 text-primary-foreground disabled:opacity-50"
                           >
@@ -460,16 +456,24 @@ export default function RecommendationsTable({
                           </button>
                         </div>
                       )}
+
+                      {recommendation.called_at && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {formatDate(
+                            recommendation.called_at,
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
               })}
 
-              {filtered.length === 0 && (
+              {!filtered.length && (
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-12 text-center text-muted-foreground"
+                    className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
                     لا يوجد صنايعية في هذا الفلتر.
                   </td>
@@ -481,4 +485,97 @@ export default function RecommendationsTable({
       </div>
     </section>
   );
+}
+
+function ApplicationStatus({
+  status,
+}: {
+  status: string | null;
+}) {
+  switch (status) {
+    case "accepted":
+      return (
+        <div className="flex items-center gap-2 font-medium">
+          <CheckCircle2 className="size-4" />
+          <span>تم قبوله</span>
+        </div>
+      );
+
+    case "rejected":
+      return (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <X className="size-4" />
+          <span>مرفوض</span>
+        </div>
+      );
+
+    case "withdrawn":
+      return (
+        <span className="text-muted-foreground">
+          منسحب
+        </span>
+      );
+
+    case "pending":
+      return (
+        <div className="flex items-center gap-2">
+          <Check className="size-4" />
+          <span>متقدم</span>
+        </div>
+      );
+
+    default:
+      return (
+        <div className="flex items-center gap-2">
+          <Check className="size-4" />
+          <span>متقدم</span>
+        </div>
+      );
+  }
+}
+
+function formatDistance(
+  distanceKm: number | null,
+) {
+  if (distanceKm == null) {
+    return "—";
+  }
+
+  if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)} م`;
+  }
+
+  return `${distanceKm.toFixed(2)} كم`;
+}
+
+function formatDate(value: string | null) {
+  if (!value) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("ar-EG", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getNotificationLabel(
+  recommendation: Recommendation,
+) {
+  if (recommendation.telegram_connected_after_job) {
+    return "اتصل بعد نشر الشغل";
+  }
+
+  if (recommendation.telegram_notified) {
+    return "تم الإرسال";
+  }
+
+  if (
+    recommendation.notification_status ===
+    "failed"
+  ) {
+    return "فشل الإرسال";
+  }
+
+  return "متصل";
 }
