@@ -1,17 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
 
-export function createAdminClient() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const secretKey = process.env.SUPABASE_SECRET_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-    if (!url || !secretKey) {
-        throw new Error("Missing Supabase server environment variables");
-    }
+if (!supabaseUrl) {
+    throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_URL",
+    );
+}
 
-    return createClient(url, secretKey, {
+if (!secretKey) {
+    throw new Error(
+        "Missing SUPABASE_SECRET_KEY",
+    );
+}
+
+export const supabaseAdmin = createClient(
+    supabaseUrl,
+    secretKey,
+    {
         auth: {
             autoRefreshToken: false,
             persistSession: false,
         },
-    });
-}
+    },
+);

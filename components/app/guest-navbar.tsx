@@ -63,7 +63,7 @@ export function GuestNavbar() {
                     className="mr-auto flex items-center gap-2"
                     style={{ fontFamily: "var(--font-cairo)" }}
                 >
-                    <Link href="/auth/sign-in">
+                    <Link href="/auth/login">
                         <Button
                             variant="ghost"
                             className="text-white hover:bg-white/10 hover:text-white"
@@ -106,16 +106,16 @@ export function GuestNavbar() {
                     </Link>
 
                     <Link
-                        href="/auth/sign-in"
+                        href="/auth/login"
                         className={[
                             "relative flex min-h-[58px] flex-col items-center justify-center",
                             "gap-1 py-2.5 text-center transition-colors",
-                            pathname === "/auth/sign-in"
+                            pathname === "/auth/login"
                                 ? "text-primary"
                                 : "text-muted-foreground hover:text-foreground",
                         ].join(" ")}
                     >
-                        {pathname === "/auth/sign-in" && (
+                        {pathname === "/auth/login" && (
                             <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
                         )}
 
