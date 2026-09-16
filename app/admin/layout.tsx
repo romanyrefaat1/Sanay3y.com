@@ -59,6 +59,14 @@ export default async function AdminLayout({
               الصنايعية
             </Link>
 
+             <Link
+              href="/admin/applications"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
+            >
+              <Hammer className="size-4" />
+              الapplications
+            </Link>
+
             <Link
               href="/admin/activity"
               className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"

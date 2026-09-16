@@ -130,3 +130,75 @@ export async function unmarkCraftsmanCalled(formData: FormData) {
 
   revalidatePath(`/admin/jobs/${jobId}`);
 }
+
+export async function updateJobApplicationStatus(
+  formData: FormData,
+) {
+  const applicationId = String(
+    formData.get("applicationId") ?? "",
+  ).trim();
+
+  const status = String(
+    formData.get("status") ?? "",
+  ).trim();
+
+  if (!applicationId) {
+    throw new Error("Missing application ID");
+  }
+
+  if (!status) {
+    throw new Error("Missing status");
+  }
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data: isAdmin, error: adminError } =
+    await supabase.rpc("is_admin");
+
+  if (adminError || !isAdmin) {
+    throw new Error("Unauthorized");
+  }
+
+  const { data, error } = await supabase.rpc(
+    "admin_update_job_application_status",
+    {
+      p_application_id: applicationId,
+      p_status: status,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("Failed to update application");
+  }
+
+  revalidatePath("/admin/applications");
+  revalidatePath(`/admin/applications/${applicationId}`);
+  revalidatePath("/admin/jobs");
+
+  const {
+    data: application,
+  } = await supabase.rpc(
+    "get_admin_job_application",
+    {
+      p_application_id: applicationId,
+    },
+  );
+
+  const jobId = application?.[0]?.job_id;
+
+  if (jobId) {
+    revalidatePath(`/admin/jobs/${jobId}`);
+  }
+}

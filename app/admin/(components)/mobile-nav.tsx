@@ -15,6 +15,7 @@ const links = [
   { href: "/admin", label: "الرئيسية", icon: LayoutDashboard },
   { href: "/admin/jobs", label: "الشغلانات", icon: BriefcaseBusiness },
   { href: "/admin/craftsmen", label: "الصنايعية", icon: Hammer },
+  { href: "/admin/applications", label: "الapplications", icon: Hammer },
   { href: "/admin/activity", label: "النشاط", icon: History },
 ];
 
