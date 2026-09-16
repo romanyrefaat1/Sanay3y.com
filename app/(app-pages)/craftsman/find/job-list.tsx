@@ -9,30 +9,23 @@ type Job = {
     description: string;
     service_type: string;
     budget: number;
-    area: string;
+    area: string | null;
     image_url: string | null;
     status: string;
     created_at: string;
-    client:
-        | {
-              id: string;
-              full_name: string | null;
-          }
-        | {
-              id: string;
-              full_name: string | null;
-          }[]
-        | null;
+    client: {
+        id: string;
+        full_name: string;
+    } | null;
 };
 
-type JobListProps = {
+export default function JobList({
+    jobs,
+    appliedJobIds,
+}: {
     jobs: Job[];
     appliedJobIds: string[];
-};
-
-export default function JobList({ jobs, appliedJobIds }: JobListProps) {
-    const applied = new Set(appliedJobIds);
-
+}) {
     if (jobs.length === 0) {
         return (
             <div className="flex-1 rounded-lg border border-border bg-card px-6 py-16 text-center">
@@ -41,11 +34,11 @@ export default function JobList({ jobs, appliedJobIds }: JobListProps) {
                 </div>
 
                 <h2 className="text-base font-semibold text-foreground">
-                    مفيش شغلانات متاحة دلوقتي
+                    مفيش شغلانات مناسبة
                 </h2>
 
                 <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
-                    جرّب تغيّر نوع الخدمة أو المنطقة، أو وسّع نطاق الميزانية.
+                    جرب توسّع المسافة أو تغيّر نوع الخدمة أو تعدّل الميزانية.
                 </p>
             </div>
         );
@@ -59,7 +52,7 @@ export default function JobList({ jobs, appliedJobIds }: JobListProps) {
                 </h2>
 
                 <p className="text-sm text-muted-foreground">
-                    شغلانات مفتوحة مناسبة لبحثك
+                    شغلانات مفتوحة قريبة منك
                 </p>
             </div>
 
@@ -68,7 +61,9 @@ export default function JobList({ jobs, appliedJobIds }: JobListProps) {
                     <JobCard
                         key={job.id}
                         job={job}
-                        hasApplied={applied.has(job.id)}
+                        hasApplied={appliedJobIds.includes(
+                            job.id
+                        )}
                     />
                 ))}
             </div>

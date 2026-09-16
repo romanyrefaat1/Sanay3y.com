@@ -34,6 +34,7 @@ type Application = {
     job_id: string;
     craftsman_id: string;
     proposed_price: number;
+    price_type: "fixed" | "starting_from" | string;
     message: string;
     status:
         | "pending"
@@ -68,6 +69,7 @@ type Profile = {
 type ApplicationWithCraftsman = Application & {
     craftsman: Profile | null;
     craftsmanProfile: CraftsmanProfile | null;
+    distanceKm: number | null;
 };
 
 const applicationStatusConfig = {
@@ -101,11 +103,30 @@ const formatDate = (date: string) =>
         dateStyle: "medium",
     }).format(new Date(date));
 
+function formatDistance(distanceKm: number | null) {
+    if (
+        distanceKm === null ||
+        !Number.isFinite(distanceKm)
+    ) {
+        return "المسافة غير متاحة";
+    }
+
+    if (distanceKm < 1) {
+        return "أقل من 1 كم";
+    }
+
+    if (distanceKm < 10) {
+        return `${distanceKm.toFixed(1)} كم`;
+    }
+
+    return `${Math.round(distanceKm)} كم`;
+}
+
 export function JobApplicationsList({
     jobId,
     isOwner,
     jobStatus,
-    selectedCraftsmanId
+    selectedCraftsmanId,
 }: JobApplicationsListProps) {
     const [applications, setApplications] =
         useState<ApplicationWithCraftsman[]>([]);
@@ -127,15 +148,28 @@ export function JobApplicationsList({
                 const supabase = createClient();
 
                 /*
-                 * Get the applications first.
+                 * ============================================================
+                 * GET APPLICATIONS
+                 * ============================================================
                  */
+
                 const {
                     data: applicationData,
                     error: applicationsError,
                 } = await supabase
                     .from("job_applications")
                     .select(
-                        "id, job_id, craftsman_id, proposed_price, message, status, created_at, updated_at",
+                        `
+                        id,
+                        job_id,
+                        craftsman_id,
+                        proposed_price,
+                        price_type,
+                        message,
+                        status,
+                        created_at,
+                        updated_at
+                        `,
                     )
                     .eq("job_id", jobId)
                     .order("created_at", {
@@ -159,8 +193,11 @@ export function JobApplicationsList({
                 }
 
                 /*
-                 * Get unique craftsman IDs.
+                 * ============================================================
+                 * CRAFTSMAN IDS
+                 * ============================================================
                  */
+
                 const craftsmanIds = [
                     ...new Set(
                         applicationData.map(
@@ -171,8 +208,11 @@ export function JobApplicationsList({
                 ];
 
                 /*
-                 * Basic public profile information.
+                 * ============================================================
+                 * PUBLIC PROFILES
+                 * ============================================================
                  */
+
                 const {
                     data: profileData,
                     error: profileError,
@@ -188,9 +228,11 @@ export function JobApplicationsList({
                 }
 
                 /*
-                 * Craftsman-specific information lives
-                 * in craftsman_profiles, not profiles.
+                 * ============================================================
+                 * CRAFTSMAN PROFILES
+                 * ============================================================
                  */
+
                 const {
                     data: craftsmanProfileData,
                     error: craftsmanProfileError,
@@ -213,6 +255,12 @@ export function JobApplicationsList({
                     throw craftsmanProfileError;
                 }
 
+                /*
+                 * ============================================================
+                 * PROFILE MAPS
+                 * ============================================================
+                 */
+
                 const profileMap = new Map<
                     string,
                     Profile
@@ -230,14 +278,96 @@ export function JobApplicationsList({
                         string,
                         CraftsmanProfile
                     >(
-                        (craftsmanProfileData ??
-                            []).map(
+                        (
+                            craftsmanProfileData ??
+                            []
+                        ).map(
                             (profile) => [
                                 profile.id,
                                 profile as CraftsmanProfile,
                             ],
                         ),
                     );
+
+                /*
+                 * ============================================================
+                 * DISTANCES
+                 * ============================================================
+                 *
+                 * get_distance_from_user() calculates the distance
+                 * between the currently authenticated user and the
+                 * target profile using the saved PostGIS locations.
+                 *
+                 * This component is intended for the job owner, so
+                 * the authenticated user is the owner.
+                 *
+                 * No coordinates are exposed to the browser.
+                 */
+
+                const distanceMap = new Map<
+                    string,
+                    number | null
+                >();
+
+                if (isOwner) {
+                    await Promise.all(
+                        craftsmanIds.map(
+                            async (craftsmanId) => {
+                                try {
+                                    const {
+                                        data,
+                                        error,
+                                    } =
+                                        await supabase.rpc(
+                                            "get_distance_from_user",
+                                            {
+                                                target_user_id:
+                                                    craftsmanId,
+                                            },
+                                        );
+
+                                    if (error) {
+                                        console.error(
+                                            `Failed to calculate distance for ${craftsmanId}:`,
+                                            error,
+                                        );
+
+                                        distanceMap.set(
+                                            craftsmanId,
+                                            null,
+                                        );
+
+                                        return;
+                                    }
+
+                                    distanceMap.set(
+                                        craftsmanId,
+                                        typeof data ===
+                                            "number"
+                                            ? data
+                                            : null,
+                                    );
+                                } catch (error) {
+                                    console.error(
+                                        `Failed to calculate distance for ${craftsmanId}:`,
+                                        error,
+                                    );
+
+                                    distanceMap.set(
+                                        craftsmanId,
+                                        null,
+                                    );
+                                }
+                            },
+                        ),
+                    );
+                }
+
+                /*
+                 * ============================================================
+                 * COMBINE DATA
+                 * ============================================================
+                 */
 
                 const combinedApplications =
                     applicationData.map(
@@ -251,6 +381,11 @@ export function JobApplicationsList({
 
                             craftsmanProfile:
                                 craftsmanProfileMap.get(
+                                    application.craftsman_id,
+                                ) ?? null,
+
+                            distanceKm:
+                                distanceMap.get(
                                     application.craftsman_id,
                                 ) ?? null,
                         }),
@@ -284,7 +419,7 @@ export function JobApplicationsList({
         return () => {
             mounted = false;
         };
-    }, [jobId]);
+    }, [jobId, isOwner]);
 
     if (isLoading) {
         return (
@@ -367,6 +502,11 @@ export function JobApplicationsList({
                                     "open" &&
                                 application.status ===
                                     "pending";
+
+                            const distanceLabel =
+                                formatDistance(
+                                    application.distanceKm,
+                                );
 
                             return (
                                 <Card
@@ -455,6 +595,20 @@ export function JobApplicationsList({
                                             </Badge>
                                         </div>
 
+                                        {/* Distance */}
+                                        {isOwner && (
+                                            <div className="mt-4 inline-flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                                                <MapPin className="size-4 shrink-0" />
+
+                                                <span>
+                                                    {application.distanceKm !==
+                                                    null
+                                                        ? `${distanceLabel} منك`
+                                                        : "المسافة غير متاحة"}
+                                                </span>
+                                            </div>
+                                        )}
+
                                         <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                                             <Clock3 className="size-3.5" />
 
@@ -469,7 +623,11 @@ export function JobApplicationsList({
                                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                                             <div>
                                                 <p className="text-xs text-muted-foreground">
-                                                    السعر {application.price_type === "fixed" ? "المقترح" : "يبدأ من"}
+                                                    السعر{" "}
+                                                    {application.price_type ===
+                                                    "fixed"
+                                                        ? "المقترح"
+                                                        : "يبدأ من"}
                                                 </p>
 
                                                 <p className="mt-1 text-base font-semibold">
@@ -481,12 +639,13 @@ export function JobApplicationsList({
                                                     جنيه
                                                 </p>
 
-                                                    <span className="">
-                                                        {application.price_type === "fixed" ? "هو ده السعر اللي هتحاسب عليه" : "السعر ده هو اقل سعر الصنايعي مستعد ياخده وهيقرر السعر الحقيقي لما يوصل ويعين الحالة"}
-                                    
-                                                    </span>
-
-                                                       </div>
+                                                <span className="text-xs leading-5 text-muted-foreground">
+                                                    {application.price_type ===
+                                                    "fixed"
+                                                        ? "هو ده السعر اللي هتحاسب عليه"
+                                                        : "السعر ده هو أقل سعر الصنايعي مستعد ياخده وهيقرر السعر الحقيقي لما يوصل ويعاين الحالة"}
+                                                </span>
+                                            </div>
 
                                             <div>
                                                 <p className="text-xs text-muted-foreground">
@@ -523,7 +682,7 @@ export function JobApplicationsList({
                                         </div>
 
                                         {/* Message */}
-                                        <div className="mt-5 bg-muted/50 py-5 px-2">
+                                        <div className="mt-5 bg-muted/50 px-2 py-5">
                                             <p className="text-xs text-muted-foreground">
                                                 الرسالة
                                             </p>
@@ -558,6 +717,7 @@ export function JobApplicationsList({
                                                                 className="gap-1"
                                                             >
                                                                 <MapPin className="size-3.5" />
+
                                                                 {
                                                                     area
                                                                 }
@@ -590,18 +750,32 @@ export function JobApplicationsList({
                                         {application.status ===
                                             "accepted" && (
                                             <div>
-                                              <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm font-medium text-green-700">
-                                                <BadgeCheck className="size-4" />
-                                                تم قبول هذا
-                                                الصنايعي
-                                            </div>
-                                              {isOwner && jobStatus === "in_progress" &&application.id === selectedCraftsmanId && <div className="mt-4">
-                                                    <span>
-                                                      عايز تكلم الصنايعي ده؟
-                                                      {" "}
-                                                      <Link href={`/chats/${jobId}`} className="underline">دوس هنا</Link>
-                                                    </span>
-                                                </div>}
+                                                <div className="mt-6 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm font-medium text-green-700">
+                                                    <BadgeCheck className="size-4" />
+
+                                                    تم قبول هذا
+                                                    الصنايعي
+                                                </div>
+
+                                                {isOwner &&
+                                                    jobStatus ===
+                                                        "in_progress" &&
+                                                    application.craftsman_id ===
+                                                        selectedCraftsmanId && (
+                                                        <div className="mt-4">
+                                                            <span>
+                                                                عايز تكلم
+                                                                الصنايعي ده؟
+                                                                {" "}
+                                                                <Link
+                                                                    href={`/chats/${jobId}`}
+                                                                    className="underline"
+                                                                >
+                                                                    دوس هنا
+                                                                </Link>
+                                                            </span>
+                                                        </div>
+                                                    )}
                                             </div>
                                         )}
                                     </CardContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -20,32 +21,107 @@ import { useRouter } from "next/navigation";
 
 export function ClientSignupForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [error, setError] = useState("");
-  const router = useRouter()
 
-  async function handleSubmit(formData: FormData) {
+  const router = useRouter();
+
+  function getLocation() {
+    setError("");
+
+    if (!navigator.geolocation) {
+      setError("المتصفح لا يدعم تحديد الموقع.");
+      return;
+    }
+
+    setIsGettingLocation(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+
+        setIsGettingLocation(false);
+        setError("");
+      },
+      (error) => {
+        setIsGettingLocation(false);
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setError(
+              "لم نتمكن من الوصول إلى موقعك. اسمح للموقع باستخدام موقعك من إعدادات المتصفح ثم اضغط على الزر مرة أخرى."
+            );
+            break;
+
+          case error.POSITION_UNAVAILABLE:
+            setError(
+              "تعذر تحديد موقعك حاليًا. تأكد من تشغيل خدمات الموقع ثم حاول مرة أخرى."
+            );
+            break;
+
+          case error.TIMEOUT:
+            setError(
+              "استغرق تحديد موقعك وقتًا طويلًا. حاول مرة أخرى."
+            );
+            break;
+
+          default:
+            setError("تعذر تحديد موقعك. حاول مرة أخرى.");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  }
+
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+
     setIsLoading(true);
     setError("");
 
-    const fullName = String(formData.get("fullName") || "");
-    const email = String(formData.get("email") || "");
+    const formData = new FormData(event.currentTarget);
+
+    const fullName = String(formData.get("fullName") || "").trim();
+    const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "");
-    const phone = String(formData.get("phone") || "");
-    const area = String(formData.get("area") || "");
+    const phone = String(formData.get("phone") || "").trim();
     const gender = String(formData.get("gender") || "");
 
-    if (!fullName || !email || !password || !phone || !area || !gender) {
+    if (!fullName || !email || !password || !phone || !gender) {
       setError("من فضلك املأ جميع الحقول المطلوبة.");
       setIsLoading(false);
       return;
     }
 
+    if (!location) {
+      setError("من فضلك حدد موقعك أولًا.");
+      setIsLoading(false);
+      return;
+    }
+
     const result = await createNewUser({
-      email,
-      password,
-      fullName,
-      role: "client",
-    });
+  email,
+  password,
+  fullName,
+  role: "client",
+  latitude: location.latitude,
+  longitude: location.longitude,
+  phone,
+  gender: gender as "male" | "female",
+});
 
     if (!result.success) {
       setError(result.error);
@@ -53,7 +129,7 @@ export function ClientSignupForm() {
       return;
     }
 
-    router.push("/confirm")
+    router.push("/confirm");
   }
 
   return (
@@ -63,7 +139,7 @@ export function ClientSignupForm() {
       </CardHeader>
 
       <CardContent>
-        <form action={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="fullName">الاسم بالكامل</Label>
             <Input
@@ -113,21 +189,9 @@ export function ClientSignupForm() {
               dir="ltr"
               required
             />
+
             <p className="text-xs text-muted-foreground">
               رقم هاتفك سيظل خاصًا ولن يظهر للآخرين.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="area">المنطقة</Label>
-            <Input
-              id="area"
-              name="area"
-              placeholder="مثال: مدينة نصر"
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              ستظهر منطقتك العامة فقط على ملفك الشخصي.
             </p>
           </div>
 
@@ -157,6 +221,47 @@ export function ClientSignupForm() {
             </RadioGroup>
           </div>
 
+          <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+            <div>
+              <p className="text-sm font-medium">
+                حدد موقعك
+              </p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                نحتاج إلى موقعك لنعرض لك الصنايعية القريبين منك.
+                لن يظهر موقعك الدقيق للمستخدمين الآخرين.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant={location ? "outline" : "default"}
+              onClick={getLocation}
+              disabled={isGettingLocation || isLoading}
+              className="w-full gap-2"
+            >
+              {location ? (
+                <>
+                  <Check className="size-4" />
+                  تم تحديد موقعك
+                </>
+              ) : (
+                <>
+                  <MapPin className="size-4" />
+                  {isGettingLocation
+                    ? "جاري تحديد موقعك..."
+                    : "تحديد موقعي"}
+                </>
+              )}
+            </Button>
+
+            {location && (
+              <p className="text-xs text-muted-foreground">
+                تم حفظ موقعك لاستخدامه في العثور على الخدمات القريبة منك.
+              </p>
+            )}
+          </div>
+
           {error && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
@@ -166,9 +271,11 @@ export function ClientSignupForm() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || isGettingLocation || !location}
           >
-            {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
+            {isLoading
+              ? "جاري إنشاء الحساب..."
+              : "إنشاء الحساب"}
           </Button>
         </form>
       </CardContent>

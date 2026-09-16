@@ -16,7 +16,6 @@ import {
     ArrowRight,
     Camera,
     Check,
-    MapPin,
     Phone,
     UserRound,
     VenusAndMars,
@@ -47,32 +46,13 @@ const clientProfileSchema = z.object({
     fullName: z
         .string()
         .trim()
-        .min(
-            2,
-            "اكتب اسمك بشكل صحيح.",
-        )
-        .max(
-            100,
-            "الاسم طويل جدًا.",
-        ),
+        .min(2, "اكتب اسمك بشكل صحيح.")
+        .max(100, "الاسم طويل جدًا."),
 
     phone: z
         .string()
         .trim()
-        .max(
-            20,
-            "رقم الهاتف طويل جدًا.",
-        )
-        .optional()
-        .or(z.literal("")),
-
-    area: z
-        .string()
-        .trim()
-        .max(
-            100,
-            "اسم المنطقة طويل جدًا.",
-        )
+        .max(20, "رقم الهاتف طويل جدًا.")
         .optional()
         .or(z.literal("")),
 
@@ -85,18 +65,15 @@ const clientProfileSchema = z.object({
 type ClientProfileForm = {
     fullName: string;
     phone: string;
-    area: string;
     gender: "male" | "female" | "";
 };
 
 type FieldName =
     | "fullName"
     | "phone"
-    | "area"
     | "gender";
 
-const MAX_AVATAR_SIZE =
-    5 * 1024 * 1024;
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 const allowedAvatarTypes = [
     "image/jpeg",
@@ -105,10 +82,7 @@ const allowedAvatarTypes = [
     "image/webp",
 ];
 
-const extensionMap: Record<
-    string,
-    string
-> = {
+const extensionMap: Record<string, string> = {
     jpg: "jpg",
     jpeg: "jpg",
     png: "png",
@@ -120,9 +94,7 @@ function getFieldError(
     values: ClientProfileForm,
 ) {
     const result =
-        clientProfileSchema.safeParse(
-            values,
-        );
+        clientProfileSchema.safeParse(values);
 
     if (result.success) {
         return "";
@@ -130,16 +102,14 @@ function getFieldError(
 
     return (
         result.error.issues.find(
-            (issue) =>
-                issue.path[0] === field,
+            (issue) => issue.path[0] === field,
         )?.message || ""
     );
 }
 
 export default function ClientProfileEditPage() {
     const router = useRouter();
-    const searchParams =
-        useSearchParams();
+    const searchParams = useSearchParams();
 
     const supabase = useMemo(
         () => createClient(),
@@ -154,19 +124,11 @@ export default function ClientProfileEditPage() {
         refreshUser,
     } = useUser();
 
-    const [fullName, setFullName] =
-        useState("");
-
-    const [phone, setPhone] =
-        useState("");
-
-    const [area, setArea] =
-        useState("");
-
-    const [gender, setGender] =
-        useState<
-            "male" | "female" | ""
-        >("");
+    const [fullName, setFullName] = useState("");
+    const [phone, setPhone] = useState("");
+    const [gender, setGender] = useState<
+        "male" | "female" | ""
+    >("");
 
     const [avatar, setAvatar] =
         useState<File | null>(null);
@@ -174,18 +136,12 @@ export default function ClientProfileEditPage() {
     const [isSaving, setIsSaving] =
         useState(false);
 
-    const [error, setError] =
-        useState("");
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
 
-    const [success, setSuccess] =
-        useState("");
-
-    const [touched, setTouched] =
-        useState<
-            Partial<
-                Record<FieldName, boolean>
-            >
-        >({});
+    const [touched, setTouched] = useState<
+        Partial<Record<FieldName, boolean>>
+    >({});
 
     const [showBackDialog, setShowBackDialog] =
         useState(false);
@@ -206,71 +162,52 @@ export default function ClientProfileEditPage() {
 
     /*
      * Fill the form from the current user.
+     *
+     * Current schema:
+     * profiles:
+     * - full_name
+     * - avatar_url
+     *
+     * client_profiles:
+     * - phone
+     * - gender
+     *
+     * Location is stored separately in
+     * profiles.location and is not manually edited here.
      */
     useEffect(() => {
         if (!profile) {
             return;
         }
 
-        setFullName(
-            profile.full_name ?? "",
-        );
+        setFullName(profile.full_name ?? "");
+        setPhone(clientProfile?.phone ?? "");
+        setGender(clientProfile?.gender ?? "");
+    }, [profile, clientProfile]);
 
-        setPhone(
-            clientProfile?.phone ?? "",
-        );
+    const values = useMemo<ClientProfileForm>(
+        () => ({
+            fullName,
+            phone,
+            gender,
+        }),
+        [fullName, phone, gender],
+    );
 
-        setArea(
-            clientProfile?.area ?? "",
-        );
+    const fullNameError = getFieldError(
+        "fullName",
+        values,
+    );
 
-        setGender(
-            clientProfile?.gender ?? "",
-        );
-    }, [
-        profile,
-        clientProfile,
-    ]);
+    const phoneError = getFieldError(
+        "phone",
+        values,
+    );
 
-    const values =
-        useMemo<ClientProfileForm>(
-            () => ({
-                fullName,
-                phone,
-                area,
-                gender,
-            }),
-            [
-                fullName,
-                phone,
-                area,
-                gender,
-            ],
-        );
-
-    const fullNameError =
-        getFieldError(
-            "fullName",
-            values,
-        );
-
-    const phoneError =
-        getFieldError(
-            "phone",
-            values,
-        );
-
-    const areaError =
-        getFieldError(
-            "area",
-            values,
-        );
-
-    const genderError =
-        getFieldError(
-            "gender",
-            values,
-        );
+    const genderError = getFieldError(
+        "gender",
+        values,
+    );
 
     const markTouched = (
         field: FieldName,
@@ -287,23 +224,18 @@ export default function ClientProfileEditPage() {
     /*
      * Local preview for a newly selected image.
      */
-    const avatarPreview =
-        useMemo(() => {
-            if (!avatar) {
-                return null;
-            }
+    const avatarPreview = useMemo(() => {
+        if (!avatar) {
+            return null;
+        }
 
-            return URL.createObjectURL(
-                avatar,
-            );
-        }, [avatar]);
+        return URL.createObjectURL(avatar);
+    }, [avatar]);
 
     useEffect(() => {
         return () => {
             if (avatarPreview) {
-                URL.revokeObjectURL(
-                    avatarPreview,
-                );
+                URL.revokeObjectURL(avatarPreview);
             }
         };
     }, [avatarPreview]);
@@ -329,10 +261,6 @@ export default function ClientProfileEditPage() {
                 .pop()
                 ?.toLowerCase() || "";
 
-        /*
-         * Validate both the actual MIME type and
-         * the file extension.
-         */
         if (
             !allowedAvatarTypes.includes(
                 file.type,
@@ -348,10 +276,7 @@ export default function ClientProfileEditPage() {
             return;
         }
 
-        if (
-            file.size >
-            MAX_AVATAR_SIZE
-        ) {
+        if (file.size > MAX_AVATAR_SIZE) {
             setAvatar(null);
             setError(
                 "حجم الصورة يجب ألا يتجاوز 5 ميجابايت.",
@@ -367,141 +292,118 @@ export default function ClientProfileEditPage() {
     };
 
     /*
-     * Upload the avatar to:
+     * Upload avatar to:
      *
-     * avatars/{user.id}/avatar.{extension}
+     * {user.id}/avatar.{extension}
      *
      * This path must match the Storage RLS policy.
      */
     const uploadAvatar = async () => {
-    if (!avatar || !user) {
-        return null;
-    }
+        if (!avatar || !user) {
+            return null;
+        }
 
-    const {
-        data: {
-            user: authUser,
-        },
-        error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError) {
-        console.error(
-            "Failed to get authenticated user:",
-            authError,
-        );
-
-        throw authError;
-    }
-
-    if (!authUser) {
-        throw new Error(
-            "NO_AUTHENTICATED_USER",
-        );
-    }
-
-    if (authUser.id !== user.id) {
-        console.error(
-            "User mismatch:",
-            {
-                contextUserId: user.id,
-                supabaseUserId: authUser.id,
+        const {
+            data: {
+                user: authUser,
             },
-        );
+            error: authError,
+        } = await supabase.auth.getUser();
 
-        throw new Error(
-            "AUTH_USER_MISMATCH",
-        );
-    }
+        if (authError) {
+            console.error(
+                "Failed to get authenticated user:",
+                authError,
+            );
 
-    const extension =
-        avatar.name
-            .split(".")
-            .pop()
-            ?.toLowerCase() || "";
+            throw authError;
+        }
 
-    const extensionMap: Record<
-        string,
-        string
-    > = {
-        jpg: "jpg",
-        jpeg: "jpg",
-        png: "png",
-        webp: "webp",
-    };
+        if (!authUser) {
+            throw new Error(
+                "NO_AUTHENTICATED_USER",
+            );
+        }
 
-    const normalizedExtension =
-        extensionMap[extension];
+        if (authUser.id !== user.id) {
+            console.error(
+                "User mismatch:",
+                {
+                    contextUserId: user.id,
+                    supabaseUserId: authUser.id,
+                },
+            );
 
-    if (!normalizedExtension) {
-        throw new Error(
-            "UNSUPPORTED_IMAGE_TYPE",
-        );
-    }
+            throw new Error(
+                "AUTH_USER_MISMATCH",
+            );
+        }
 
-    const filePath =
-        `${authUser.id}/avatar.${normalizedExtension}`;
+        const extension =
+            avatar.name
+                .split(".")
+                .pop()
+                ?.toLowerCase() || "";
 
-    console.log(
-        "Avatar upload attempt:",
-        {
-            contextUserId: user.id,
-            authUserId: authUser.id,
-            filePath,
-            mimeType: avatar.type,
-            size: avatar.size,
-        },
-    );
+        const normalizedExtension =
+            extensionMap[extension];
 
-    const {
-        data,
-        error: uploadError,
-    } = await supabase.storage
-        .from("avatars")
-        .upload(
-            filePath,
-            avatar,
-            {
-                cacheControl: "3600",
-                upsert: true,
-                contentType: avatar.type,
-            },
-        );
+        if (!normalizedExtension) {
+            throw new Error(
+                "UNSUPPORTED_IMAGE_TYPE",
+            );
+        }
 
-    if (uploadError) {
-        console.error(
-            "Avatar upload failed:",
-            {
-                message:
-                    uploadError.message,
-                name:
-                    uploadError.name,
-                statusCode:
-                    uploadError.statusCode,
+        const filePath =
+            `${authUser.id}/avatar.${normalizedExtension}`;
+
+        const {
+            data,
+            error: uploadError,
+        } = await supabase.storage
+            .from("avatars")
+            .upload(
                 filePath,
+                avatar,
+                {
+                    cacheControl: "3600",
+                    upsert: true,
+                    contentType: avatar.type,
+                },
+            );
+
+        if (uploadError) {
+            console.error(
+                "Avatar upload failed:",
+                {
+                    message:
+                        uploadError.message,
+                    name:
+                        uploadError.name,
+                    statusCode:
+                        uploadError.statusCode,
+                    filePath,
+                },
+            );
+
+            throw uploadError;
+        }
+
+        console.log(
+            "Avatar uploaded successfully:",
+            data,
+        );
+
+        const {
+            data: {
+                publicUrl,
             },
-        );
+        } = supabase.storage
+            .from("avatars")
+            .getPublicUrl(filePath);
 
-        throw uploadError;
-    }
-
-    console.log(
-        "Avatar uploaded successfully:",
-        data,
-    );
-
-    const {
-        data: {
-            publicUrl,
-        },
-    } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(
-            filePath,
-        );
-
-    return `${publicUrl}?v=${Date.now()}`;
-};
+        return `${publicUrl}?v=${Date.now()}`;
+    };
 
     const handleSubmit = async (
         event: FormEvent<HTMLFormElement>,
@@ -518,10 +420,7 @@ export default function ClientProfileEditPage() {
             return;
         }
 
-        if (
-            profile.role !==
-            "client"
-        ) {
+        if (profile.role !== "client") {
             setError(
                 "هذه الصفحة مخصصة للعملاء فقط.",
             );
@@ -537,16 +436,12 @@ export default function ClientProfileEditPage() {
             const firstIssue =
                 result.error.issues[0];
 
-            if (
-                firstIssue?.path[0]
-            ) {
-                setTouched(
-                    (current) => ({
-                        ...current,
-                        [firstIssue.path[0] as FieldName]:
-                            true,
-                    }),
-                );
+            if (firstIssue?.path[0]) {
+                setTouched((current) => ({
+                    ...current,
+                    [firstIssue.path[0] as FieldName]:
+                        true,
+                }));
             }
 
             setError(
@@ -584,56 +479,46 @@ export default function ClientProfileEditPage() {
             }
 
             const {
-                error:
-                    profileError,
+                error: profileError,
             } = await supabase
                 .from("profiles")
-                .update(
-                    profileUpdate,
-                )
-                .eq(
-                    "id",
-                    user.id,
-                );
+                .update(profileUpdate)
+                .eq("id", user.id);
 
             if (profileError) {
                 throw profileError;
             }
 
             /*
-             * Create client_profiles if it doesn't
-             * exist, otherwise update it.
+             * Update client_profiles.
+             *
+             * Current schema:
+             * - id
+             * - phone
+             * - gender
+             *
+             * No area column exists anymore.
              */
             const {
-                error:
-                    clientProfileError,
+                error: clientProfileError,
             } = await supabase
-                .from(
-                    "client_profiles",
-                )
+                .from("client_profiles")
                 .upsert(
                     {
                         id: user.id,
                         phone:
                             result.data.phone.trim() ||
                             null,
-                        area:
-                            result.data.area.trim() ||
-                            null,
                         gender:
-                            result.data
-                                .gender ||
+                            result.data.gender ||
                             null,
                     },
                     {
-                        onConflict:
-                            "id",
+                        onConflict: "id",
                     },
                 );
 
-            if (
-                clientProfileError
-            ) {
+            if (clientProfileError) {
                 throw clientProfileError;
             }
 
@@ -643,14 +528,13 @@ export default function ClientProfileEditPage() {
             await refreshUser();
 
             setAvatar(null);
+
             setSuccess(
                 "تم حفظ التعديلات بنجاح.",
             );
 
             if (backTo) {
-                setShowBackDialog(
-                    true,
-                );
+                setShowBackDialog(true);
             }
         } catch (caughtError) {
             console.error(
@@ -695,11 +579,10 @@ export default function ClientProfileEditPage() {
                     "تعذر رفع الصورة بسبب صلاحيات التخزين. تأكد من إعدادات Storage الخاصة بمجلد المستخدم.",
                 );
             } else if (
-                saveError.statusCode ===
-                    400 ||
-                saveError.message?.toLowerCase().includes(
-                    "mime",
-                )
+                saveError.statusCode === 400 ||
+                saveError.message
+                    ?.toLowerCase()
+                    .includes("mime")
             ) {
                 setError(
                     "صيغة الصورة غير مسموحة.",
@@ -727,10 +610,7 @@ export default function ClientProfileEditPage() {
 
     if (isLoading) {
         return (
-            <div
-                 
-                className="mx-auto w-full max-w-3xl px-4 py-6"
-            >
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 <p className="text-sm text-muted-foreground">
                     جاري تحميل الملف...
                 </p>
@@ -740,20 +620,15 @@ export default function ClientProfileEditPage() {
 
     if (
         !profile ||
-        profile.role !==
-            "client"
+        profile.role !== "client"
     ) {
         return (
-            <div
-                 
-                className="mx-auto w-full max-w-3xl px-4 py-6"
-            >
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 <Card>
                     <CardContent className="p-6">
                         <p className="text-sm text-muted-foreground">
-                            هذه الصفحة
-                            مخصصة للعملاء
-                            فقط.
+                            هذه الصفحة مخصصة
+                            للعملاء فقط.
                         </p>
                     </CardContent>
                 </Card>
@@ -762,10 +637,7 @@ export default function ClientProfileEditPage() {
     }
 
     return (
-        <div
-             
-            className="mx-auto w-full max-w-3xl px-4 py-6"
-        >
+        <div className="mx-auto w-full max-w-3xl px-4 py-6">
             {/* Header */}
             <div className="mb-6">
                 <Link
@@ -781,16 +653,13 @@ export default function ClientProfileEditPage() {
                 </h1>
 
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    حدّث بياناتك عشان
-                    تفضل معلومات حسابك
-                    صحيحة.
+                    حدّث بياناتك عشان تفضل
+                    معلومات حسابك صحيحة.
                 </p>
             </div>
 
             <form
-                onSubmit={
-                    handleSubmit
-                }
+                onSubmit={handleSubmit}
                 className="space-y-6"
             >
                 {/* Avatar */}
@@ -843,9 +712,8 @@ export default function ClientProfileEditPage() {
                                 </p>
 
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    JPG أو PNG أو
-                                    WEBP بحد أقصى
-                                    5 ميجابايت.
+                                    JPG أو PNG أو WEBP
+                                    بحد أقصى 5 ميجابايت.
                                 </p>
                             </div>
                         </div>
@@ -861,8 +729,7 @@ export default function ClientProfileEditPage() {
                             </h2>
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                عدّل بيانات حسابك
-                                من هنا.
+                                عدّل بيانات حسابك من هنا.
                             </p>
                         </div>
 
@@ -884,31 +751,23 @@ export default function ClientProfileEditPage() {
 
                                 <Input
                                     id="fullName"
-                                    value={
-                                        fullName
-                                    }
+                                    value={fullName}
                                     onFocus={() =>
                                         markTouched(
                                             "fullName",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "fullName",
                                         );
 
                                         setFullName(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="مثال: أحمد محمد"
-                                    maxLength={
-                                        100
-                                    }
+                                    maxLength={100}
                                     aria-invalid={
                                         touched.fullName &&
                                         Boolean(
@@ -919,9 +778,8 @@ export default function ClientProfileEditPage() {
 
                                 {!touched.fullName && (
                                     <p className="text-xs text-muted-foreground">
-                                        الاسم الذي
-                                        سيظهر على
-                                        حسابك.
+                                        الاسم الذي سيظهر
+                                        على حسابك.
                                     </p>
                                 )}
 
@@ -965,31 +823,23 @@ export default function ClientProfileEditPage() {
                                     id="phone"
                                     type="tel"
                                     dir="ltr"
-                                    value={
-                                        phone
-                                    }
+                                    value={phone}
                                     onFocus={() =>
                                         markTouched(
                                             "phone",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "phone",
                                         );
 
                                         setPhone(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="01xxxxxxxxx"
-                                    maxLength={
-                                        20
-                                    }
+                                    maxLength={20}
                                     aria-invalid={
                                         touched.phone &&
                                         Boolean(
@@ -1000,19 +850,15 @@ export default function ClientProfileEditPage() {
 
                                 {!touched.phone && (
                                     <p className="text-xs text-muted-foreground">
-                                        رقم الهاتف
-                                        لا يظهر
-                                        للمستخدمين
-                                        الآخرين.
+                                        رقم الهاتف لا يظهر
+                                        للمستخدمين الآخرين.
                                     </p>
                                 )}
 
                                 {touched.phone &&
                                     phoneError && (
                                         <p className="text-xs text-destructive">
-                                            {
-                                                phoneError
-                                            }
+                                            {phoneError}
                                         </p>
                                     )}
 
@@ -1022,86 +868,6 @@ export default function ClientProfileEditPage() {
                                         <p className="flex items-center gap-1 text-xs text-green-600">
                                             <Check className="h-3.5 w-3.5" />
                                             رقم الهاتف صحيح
-                                        </p>
-                                    )}
-                            </div>
-
-                            {/* Area */}
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-
-                                    <label
-                                        htmlFor="area"
-                                        className="text-sm font-medium"
-                                    >
-                                        المنطقة
-                                    </label>
-
-                                    <span className="text-xs text-muted-foreground">
-                                        اختياري
-                                    </span>
-                                </div>
-
-                                <Input
-                                    id="area"
-                                    value={
-                                        area
-                                    }
-                                    onFocus={() =>
-                                        markTouched(
-                                            "area",
-                                        )
-                                    }
-                                    onChange={(
-                                        event,
-                                    ) => {
-                                        markTouched(
-                                            "area",
-                                        );
-
-                                        setArea(
-                                            event
-                                                .target
-                                                .value,
-                                        );
-                                    }}
-                                    placeholder="مثال: مدينة نصر"
-                                    maxLength={
-                                        100
-                                    }
-                                    aria-invalid={
-                                        touched.area &&
-                                        Boolean(
-                                            areaError,
-                                        )
-                                    }
-                                />
-
-                                {!touched.area && (
-                                    <p className="text-xs text-muted-foreground">
-                                        المنطقة فقط،
-                                        وليس عنوان
-                                        البيت.
-                                    </p>
-                                )}
-
-                                {touched.area &&
-                                    areaError && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                areaError
-                                            }
-                                        </p>
-                                    )}
-
-                                {touched.area &&
-                                    !areaError &&
-                                    area.trim() && (
-                                        <p className="flex items-center gap-1 text-xs text-green-600">
-                                            <Check className="h-3.5 w-3.5" />
-                                            المنطقة تم
-                                            تحديدها
                                         </p>
                                     )}
                             </div>
@@ -1125,24 +891,19 @@ export default function ClientProfileEditPage() {
 
                                 <select
                                     id="gender"
-                                    value={
-                                        gender
-                                    }
+                                    value={gender}
                                     onFocus={() =>
                                         markTouched(
                                             "gender",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "gender",
                                         );
 
                                         setGender(
-                                            event
-                                                .target
+                                            event.target
                                                 .value as
                                                 | "male"
                                                 | "female"
@@ -1172,17 +933,14 @@ export default function ClientProfileEditPage() {
 
                                 {!touched.gender && (
                                     <p className="text-xs text-muted-foreground">
-                                        بيانات خاصة
-                                        بحسابك.
+                                        بيانات خاصة بحسابك.
                                     </p>
                                 )}
 
                                 {touched.gender &&
                                     genderError && (
                                         <p className="text-xs text-destructive">
-                                            {
-                                                genderError
-                                            }
+                                            {genderError}
                                         </p>
                                     )}
 
@@ -1191,10 +949,34 @@ export default function ClientProfileEditPage() {
                                     gender && (
                                         <p className="flex items-center gap-1 text-xs text-green-600">
                                             <Check className="h-3.5 w-3.5" />
-                                            تم اختيار
-                                            النوع
+                                            تم اختيار النوع
                                         </p>
                                     )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Location */}
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                                {/* <Mappin className="h-4 w-4 text-muted-foreground" /> */}
+                            </div>
+
+                            <div>
+                                <h2 className="font-semibold">
+                                    الموقع
+                                </h2>
+
+                                <p className="mt-1 text-sm leading-7 text-muted-foreground">
+                                    موقعك الدقيق محفوظ بشكل
+                                    خاص لمساعدتك في العثور
+                                    على الصنايعية القريبين
+                                    منك. لا يتم عرض إحداثيات
+                                    موقعك للمستخدمين الآخرين.
+                                </p>
                             </div>
                         </div>
                     </CardContent>
@@ -1208,14 +990,10 @@ export default function ClientProfileEditPage() {
                         </h2>
 
                         <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                            رقم الهاتف
-                            والنوع لا يظهروا
-                            للمستخدمين
-                            الآخرين. المنطقة
-                            تستخدم لمساعدتك
-                            في الوصول إلى
-                            الصنايعية القريبين
-                            منك.
+                            رقم الهاتف والنوع لا يظهروا
+                            للمستخدمين الآخرين. موقعك
+                            الدقيق محفوظ بشكل خاص ويُستخدم
+                            فقط للميزات المرتبطة بالموقع.
                         </p>
                     </CardContent>
                 </Card>
@@ -1252,9 +1030,7 @@ export default function ClientProfileEditPage() {
 
                         <Button
                             type="submit"
-                            disabled={
-                                isSaving
-                            }
+                            disabled={isSaving}
                             className="w-full sm:w-auto"
                         >
                             {isSaving
@@ -1267,14 +1043,10 @@ export default function ClientProfileEditPage() {
 
             {/* Back dialog */}
             <Dialog
-                open={
-                    showBackDialog
-                }
-                onOpenChange={
-                    setShowBackDialog
-                }
+                open={showBackDialog}
+                onOpenChange={setShowBackDialog}
             >
-                <DialogContent  >
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
                             عايز ترجع لصفحة{" "}
@@ -1282,10 +1054,8 @@ export default function ClientProfileEditPage() {
                         </DialogTitle>
 
                         <DialogDescription>
-                            تم حفظ تعديلاتك
-                            بنجاح. تحب
-                            ترجع للصفحة
-                            اللي جيت منها؟
+                            تم حفظ تعديلاتك بنجاح. تحب
+                            ترجع للصفحة اللي جيت منها؟
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1294,9 +1064,7 @@ export default function ClientProfileEditPage() {
                             type="button"
                             variant="outline"
                             onClick={() =>
-                                setShowBackDialog(
-                                    false,
-                                )
+                                setShowBackDialog(false)
                             }
                             className="w-full sm:w-auto"
                         >
@@ -1306,16 +1074,10 @@ export default function ClientProfileEditPage() {
                         <Button
                             type="button"
                             onClick={() => {
-                                setShowBackDialog(
-                                    false,
-                                );
+                                setShowBackDialog(false);
 
-                                if (
-                                    backTo
-                                ) {
-                                    router.push(
-                                        backTo,
-                                    );
+                                if (backTo) {
+                                    router.push(backTo);
                                 }
                             }}
                             className="w-full sm:w-auto"

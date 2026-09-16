@@ -65,6 +65,22 @@ const formatDate = (date: string) =>
         dateStyle: "medium",
     }).format(new Date(date));
 
+function formatDistance(distanceKm: number | null) {
+    if (distanceKm === null || !Number.isFinite(distanceKm)) {
+        return "المسافة غير متاحة";
+    }
+
+    if (distanceKm < 1) {
+        return "أقل من 1 كم منك";
+    }
+
+    if (distanceKm < 10) {
+        return `${distanceKm.toFixed(1)} كم منك`;
+    }
+
+    return `${Math.round(distanceKm)} كم منك`;
+}
+
 export default async function JobDetailsPage({
     params,
     searchParams,
@@ -121,7 +137,7 @@ export default async function JobDetailsPage({
     /*
      * Only fetch public profile fields for the job owner.
      *
-     * Do not fetch phone, private client data, etc.
+     * Never fetch the client's location directly.
      */
     const { data: jobClient } = await supabase
         .from("profiles")
@@ -132,6 +148,40 @@ export default async function JobDetailsPage({
         .eq("role", "client")
         .eq("is_active", true)
         .single();
+
+    /*
+     * Calculate distance securely through the RPC.
+     *
+     * The RPC uses auth.uid() internally, so the user's exact
+     * location and the client's exact location never reach this page.
+     *
+     * Guests do not have a reference location, so no distance
+     * calculation is attempted for them.
+     */
+    let distanceKm: number | null = null;
+
+    if (user && user.id !== job.client_id) {
+        const { data: distance, error: distanceError } =
+            await supabase.rpc(
+                "get_distance_from_user",
+                {
+                    target_user_id: job.client_id,
+                }
+            );
+
+        if (distanceError) {
+            console.error(
+                "Failed to calculate job distance:",
+                distanceError
+            );
+        } else if (distance !== null) {
+            const parsedDistance = Number(distance);
+
+            if (Number.isFinite(parsedDistance)) {
+                distanceKm = parsedDistance;
+            }
+        }
+    }
 
     const isOwner = user?.id === job.client_id;
 
@@ -288,11 +338,17 @@ export default async function JobDetailsPage({
 
                                     <div>
                                         <p className="text-xs text-muted-foreground">
-                                            المنطقة
+                                            المسافة
                                         </p>
 
                                         <p className="mt-1 text-base font-semibold">
-                                            {job.area}
+                                            {isOwner
+                                                ? "أنت صاحب الشغلانة"
+                                                : user
+                                                  ? formatDistance(
+                                                        distanceKm
+                                                    )
+                                                  : "سجّل الدخول لمعرفة المسافة"}
                                         </p>
                                     </div>
                                 </div>

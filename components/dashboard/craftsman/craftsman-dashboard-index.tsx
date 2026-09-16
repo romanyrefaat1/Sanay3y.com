@@ -26,6 +26,8 @@ type JobStats = {
     completed: number;
 };
 
+type VerificationStatus = "pending" | "verified" | "rejected";
+
 export default function CraftsmanDashboardIndex() {
     const {
         profile,
@@ -43,7 +45,7 @@ export default function CraftsmanDashboardIndex() {
 
     const [isStatsLoading, setIsStatsLoading] = useState(true);
 
-    const verificationText = {
+    const verificationText: Record<VerificationStatus, string> = {
         pending: "قيد التوثيق",
         verified: "حساب موثق",
         rejected: "التوثيق مرفوض",
@@ -55,6 +57,8 @@ export default function CraftsmanDashboardIndex() {
             return;
         }
 
+        let cancelled = false;
+
         const fetchJobStats = async () => {
             setIsStatsLoading(true);
 
@@ -62,20 +66,17 @@ export default function CraftsmanDashboardIndex() {
 
             const { data, error } = await supabase
                 .from("jobs")
-                .select(
-                    `
-                        id,
-                        status,
-                        client_finished_at,
-                        craftsman_finished_at
-                    `
-                )
+                .select("id, status")
                 .eq("selected_craftsman_id", profile.id);
+
+            if (cancelled) {
+                return;
+            }
 
             if (error) {
                 console.error(
                     "Failed to fetch craftsman job stats:",
-                    error
+                    error,
                 );
 
                 setJobStats({
@@ -90,10 +91,7 @@ export default function CraftsmanDashboardIndex() {
             const jobs = data ?? [];
 
             const completedJobs = jobs.filter(
-                (job) =>
-                    job.status === "completed" ||
-                    Boolean(job.client_finished_at) ||
-                    Boolean(job.craftsman_finished_at)
+                (job) => job.status === "completed",
             );
 
             setJobStats({
@@ -105,19 +103,41 @@ export default function CraftsmanDashboardIndex() {
         };
 
         fetchJobStats();
+
+        return () => {
+            cancelled = true;
+        };
     }, [profile?.id, profile?.role]);
 
     const completionRate =
         jobStats.total > 0
             ? Math.round(
-                  (jobStats.completed / jobStats.total) * 100
+                  (jobStats.completed / jobStats.total) * 100,
               )
             : 0;
+
+    const experienceText =
+        craftsman?.experience_years === null ||
+        craftsman?.experience_years === undefined
+            ? "غير محددة"
+            : craftsman.experience_years === 0
+              ? "أقل من سنة"
+              : craftsman.experience_years === 1
+                ? "سنة واحدة"
+                : craftsman.experience_years === 2
+                  ? "سنتان"
+                  : craftsman.experience_years <= 10
+                    ? `${craftsman.experience_years} سنوات`
+                    : `${craftsman.experience_years} سنة`;
+
+    const verificationStatus =
+        (craftsman?.verification_status as VerificationStatus) ??
+        "pending";
 
     return (
         <div className="mx-auto w-full max-w-6xl px-4 py-6">
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                     <h1 className="truncate text-2xl font-bold">
                         {isLoading
@@ -163,7 +183,7 @@ export default function CraftsmanDashboardIndex() {
                                         <img
                                             src={profile.avatar_url}
                                             alt={
-                                                profile?.full_name ||
+                                                profile.full_name ||
                                                 "صورة الملف الشخصي"
                                             }
                                             className="h-full w-full object-cover"
@@ -188,8 +208,7 @@ export default function CraftsmanDashboardIndex() {
                                             <span>
                                                 {
                                                     verificationText[
-                                                        craftsman
-                                                            .verification_status
+                                                        verificationStatus
                                                     ]
                                                 }
                                             </span>
@@ -202,7 +221,11 @@ export default function CraftsmanDashboardIndex() {
 
                             <div className="space-y-2 text-sm">
                                 <Link
-                                    href="/profile"
+                                    href={
+                                        profile?.id
+                                            ? `/profile/${profile.id}`
+                                            : "/profile"
+                                    }
                                     className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
                                     <span>الملف العام</span>
@@ -409,22 +432,23 @@ export default function CraftsmanDashboardIndex() {
                                 </p>
 
                                 <p className="mt-2 text-2xl font-bold">
-                                    {craftsman
-                                        ?.average_response_time_minutes ??
+                                    {craftsman?.average_response_time_minutes ??
                                         "—"}
                                 </p>
 
-                                {craftsman
-                                    ?.average_response_time_minutes && (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        دقيقة
-                                    </p>
-                                )}
+                                {craftsman?.average_response_time_minutes !==
+                                    null &&
+                                    craftsman?.average_response_time_minutes !==
+                                        undefined && (
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            دقيقة
+                                        </p>
+                                    )}
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* Profile information */}
+                    {/* Profile Information */}
                     <Card>
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
@@ -456,9 +480,7 @@ export default function CraftsmanDashboardIndex() {
                                         </p>
 
                                         <p className="mt-1 text-sm font-medium">
-                                            {craftsman?.experience_years ??
-                                                0}{" "}
-                                            سنة
+                                            {experienceText}
                                         </p>
                                     </div>
                                 </div>
@@ -517,7 +539,7 @@ export default function CraftsmanDashboardIndex() {
                                     النبذة
                                 </p>
 
-                                <p className="mt-2 text-sm leading-7">
+                                <p className="mt-2 whitespace-pre-line text-sm leading-7">
                                     {craftsman?.bio ||
                                         "لم تتم إضافة نبذة بعد."}
                                 </p>
@@ -561,31 +583,6 @@ export default function CraftsmanDashboardIndex() {
                             )}
                         </CardContent>
                     </Card>
-
-                    {/* Activity */}
-                    {/* <Card>
-                        <CardContent className="flex items-center justify-between gap-4 p-6">
-                            <div>
-                                <h2 className="font-semibold">
-                                    آخر النشاط
-                                </h2>
-
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    لا توجد أنشطة جديدة حالياً.
-                                </p>
-                            </div>
-
-                            <Link href="/chats">
-                                <Button
-                                    variant="outline"
-                                    className="gap-2"
-                                >
-                                    <MessageSquare className="h-4 w-4" />
-                                    الرسائل
-                                </Button>
-                            </Link>
-                        </CardContent>
-                    </Card> */}
                 </div>
             </div>
         </div>

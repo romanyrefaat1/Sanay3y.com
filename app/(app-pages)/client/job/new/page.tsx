@@ -20,10 +20,17 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+    Avatar,
+    AvatarFallback,
+    AvatarImage,
+} from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+    Card,
+    CardContent,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -164,17 +171,11 @@ export default function CreateJobPage() {
         Partial<Record<FieldName, boolean>>
     >({});
 
-    const [isDraftLoaded, setIsDraftLoaded] = useState(false);
+    const [isDraftLoaded, setIsDraftLoaded] =
+        useState(false);
 
-    /*
-     * Optional targeted craftsman.
-     *
-     * Example:
-     * /client/job/new?craftsman=USER_UUID
-     */
-    const [craftsmanId, setCraftsmanId] = useState<string | null>(
-        null,
-    );
+    const [craftsmanId, setCraftsmanId] =
+        useState<string | null>(null);
 
     const [targetCraftsman, setTargetCraftsman] =
         useState<TargetCraftsman | null>(null);
@@ -186,7 +187,7 @@ export default function CreateJobPage() {
         useState("");
 
     /*
-     * Read the optional craftsman query parameter.
+     * Read optional targeted craftsman.
      */
     useEffect(() => {
         const params = new URLSearchParams(
@@ -204,7 +205,7 @@ export default function CreateJobPage() {
     }, []);
 
     /*
-     * Resolve and validate the targeted craftsman.
+     * Resolve targeted craftsman.
      */
     useEffect(() => {
         if (!craftsmanId) {
@@ -222,10 +223,6 @@ export default function CreateJobPage() {
             setTargetCraftsman(null);
 
             try {
-                /*
-                 * First make sure the ID belongs to an
-                 * active craftsman profile.
-                 */
                 const {
                     data: profileData,
                     error: profileError,
@@ -277,10 +274,6 @@ export default function CreateJobPage() {
                     return;
                 }
 
-                /*
-                 * Make sure the craftsman actually has a
-                 * craftsman_profiles record.
-                 */
                 const {
                     data: craftsmanData,
                     error: craftsmanProfileError,
@@ -314,9 +307,12 @@ export default function CreateJobPage() {
                 if (isMounted) {
                     setTargetCraftsman({
                         id: profileData.id,
-                        full_name: profileData.full_name,
-                        avatar_url: profileData.avatar_url,
-                        is_active: profileData.is_active,
+                        full_name:
+                            profileData.full_name,
+                        avatar_url:
+                            profileData.avatar_url,
+                        is_active:
+                            profileData.is_active,
                         verification_status:
                             craftsmanData.verification_status,
                         is_available:
@@ -355,7 +351,7 @@ export default function CreateJobPage() {
         : null;
 
     /*
-     * Restore saved draft.
+     * Restore draft.
      */
     useEffect(() => {
         if (!user || !draftKey) {
@@ -403,10 +399,14 @@ export default function CreateJobPage() {
     }, [user, draftKey]);
 
     /*
-     * Save draft after initial restore.
+     * Save draft.
      */
     useEffect(() => {
-        if (!user || !draftKey || !isDraftLoaded) {
+        if (
+            !user ||
+            !draftKey ||
+            !isDraftLoaded
+        ) {
             return;
         }
 
@@ -479,27 +479,25 @@ export default function CreateJobPage() {
         !serviceTypeError &&
         !budgetError;
 
-    const hasArea = Boolean(
-        clientProfile?.area?.trim(),
-    );
+    /*
+     * Location now comes from profiles.location.
+     *
+     * The UI does not expose or ask about the old
+     * client_profiles.area field.
+     */
+    const hasLocation = Boolean(profile?.location);
 
     const isTargetedOffer = Boolean(
         craftsmanId && targetCraftsman,
     );
 
-    /*
-     * We only allow submission with a targeted user when
-     * the query parameter has been successfully resolved.
-     *
-     * This prevents accidentally inserting a bad
-     * targeted_at_user value.
-     */
     const targetIsValid =
-        !craftsmanId || Boolean(targetCraftsman);
+        !craftsmanId ||
+        Boolean(targetCraftsman);
 
     const canSubmit =
         hasValidForm &&
-        hasArea &&
+        hasLocation &&
         Boolean(user) &&
         profile?.role === "client" &&
         Boolean(clientProfile) &&
@@ -507,7 +505,9 @@ export default function CreateJobPage() {
         !isLoadingCraftsman &&
         !isSubmitting;
 
-    const markTouched = (field: FieldName) => {
+    const markTouched = (
+        field: FieldName,
+    ) => {
         setTouched((current) => ({
             ...current,
             [field]: true,
@@ -533,7 +533,8 @@ export default function CreateJobPage() {
     const handleImageChange = (
         event: ChangeEvent<HTMLInputElement>,
     ) => {
-        const file = event.target.files?.[0];
+        const file =
+            event.target.files?.[0];
 
         if (!file) {
             return;
@@ -575,27 +576,31 @@ export default function CreateJobPage() {
 
         const fileName = `${crypto.randomUUID()}.${extension}`;
 
-        const filePath = `${user.id}/${fileName}`;
+        const filePath =
+            `${user.id}/${fileName}`;
 
-        const { error: uploadError } =
-            await supabase.storage
-                .from("job-images")
-                .upload(
-                    filePath,
-                    image,
-                    {
-                        cacheControl: "3600",
-                        upsert: false,
-                        contentType: image.type,
-                    },
-                );
+        const {
+            error: uploadError,
+        } = await supabase.storage
+            .from("job-images")
+            .upload(
+                filePath,
+                image,
+                {
+                    cacheControl: "3600",
+                    upsert: false,
+                    contentType: image.type,
+                },
+            );
 
         if (uploadError) {
             throw uploadError;
         }
 
         const {
-            data: { publicUrl },
+            data: {
+                publicUrl,
+            },
         } = supabase.storage
             .from("job-images")
             .getPublicUrl(filePath);
@@ -610,9 +615,6 @@ export default function CreateJobPage() {
 
         setSubmitError("");
 
-        /*
-         * Account checks.
-         */
         if (!user || !profile) {
             setSubmitError(
                 "يجب تسجيل الدخول أولاً.",
@@ -634,27 +636,27 @@ export default function CreateJobPage() {
             return;
         }
 
-        if (!clientProfile.area?.trim()) {
+        /*
+         * Location is required.
+         * The UI talks about location, not area.
+         */
+        if (!profile.location) {
             setSubmitError(
-                "لا يمكنك نشر شغلانة قبل تحديد منطقتك في الملف الشخصي.",
+                "لا يمكنك نشر شغلانة قبل تحديد موقعك.",
             );
             return;
         }
 
-        /*
-         * If the URL contained a craftsman ID,
-         * require it to resolve successfully.
-         */
-        if (craftsmanId && !targetCraftsman) {
+        if (
+            craftsmanId &&
+            !targetCraftsman
+        ) {
             setSubmitError(
                 "الصنايعي المطلوب غير متاح. راجع الرابط وحاول مرة أخرى.",
             );
             return;
         }
 
-        /*
-         * Final Zod validation.
-         */
         const result =
             createJobSchema.safeParse(values);
 
@@ -681,54 +683,68 @@ export default function CreateJobPage() {
         try {
             setIsSubmitting(true);
 
-            const imageUrl = await uploadImage();
+            const imageUrl =
+                await uploadImage();
 
             /*
-             * targeted_at_user:
+             * jobs.area is still NOT NULL in the
+             * existing database schema.
              *
-             * Normal job:
-             *   null
-             *
-             * Targeted offer:
-             *   craftsman profile/user ID
+             * We keep the existing database value
+             * here for compatibility, but it is no
+             * longer part of the UI or location UX.
              */
-            const {
-                data,
-                error: insertError,
-            } = await supabase
-                .from("jobs")
-                .insert({
-                    client_id: user.id,
-                    title: result.data.title,
-                    description:
-                        result.data.description,
-                    service_type:
-                        result.data.serviceType,
-                    budget: Number(
-                        result.data.budget,
-                    ),
-                    area: clientProfile.area.trim(),
-                    image_url: imageUrl,
-                    status: "open",
-                    targeted_at_user:
-                        targetCraftsman?.id ?? null,
-                })
-                .select("id")
-                .single();
+            const { data, error: insertError } =
+                await supabase
+                    .from("jobs")
+                    .insert({
+                        client_id: user.id,
+                        title:
+                            result.data.title,
+                        description:
+                            result.data
+                                .description,
+                        service_type:
+                            result.data
+                                .serviceType,
+                        budget: Number(
+                            result.data.budget,
+                        ),
+
+                        /*
+                         * Required by the current
+                         * jobs schema.
+                         */
+                        area:
+                            clientProfile.area?.trim() ||
+                            "غير محدد",
+
+                        image_url:
+                            imageUrl,
+
+                        status: "open",
+
+                        targeted_at_user:
+                            targetCraftsman?.id ??
+                            null,
+                    })
+                    .select("id")
+                    .single();
 
             if (insertError) {
                 throw insertError;
             }
 
-            /*
-             * Delete the saved draft only after
-             * the job was successfully created.
-             */
             if (draftKey) {
-                localStorage.removeItem(draftKey);
+                localStorage.removeItem(
+                    draftKey,
+                );
             }
 
-            router.push(`/jobs/${data.id}`);
+            router.push(
+                `/jobs/${data.id}`,
+            );
+
             router.refresh();
         } catch (error) {
             console.error(
@@ -831,7 +847,7 @@ export default function CreateJobPage() {
                 )}
             </div>
 
-            {/* Invalid / unavailable craftsman */}
+            {/* Craftsman error */}
             {craftsmanId &&
                 !isLoadingCraftsman &&
                 craftsmanError && (
@@ -843,8 +859,7 @@ export default function CreateJobPage() {
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
                             تقدر تكمل وتنشر الشغلانة
                             بشكل عادي، وهتظهر
-                            للصنايعية المناسبين في
-                            منطقتك.
+                            للصنايعية المناسبين.
                         </p>
                     </div>
                 )}
@@ -967,7 +982,8 @@ export default function CreateJobPage() {
                                             "title",
                                         );
                                         setTitle(
-                                            event.target.value,
+                                            event.target
+                                                .value,
                                         );
                                     }}
                                     placeholder="مثال: إصلاح تسريب في الحنفية"
@@ -1026,7 +1042,8 @@ export default function CreateJobPage() {
                                             "serviceType",
                                         );
                                         setServiceType(
-                                            event.target.value,
+                                            event.target
+                                                .value,
                                         );
                                     }}
                                     aria-invalid={
@@ -1102,7 +1119,8 @@ export default function CreateJobPage() {
                                             "description",
                                         );
                                         setDescription(
-                                            event.target.value,
+                                            event.target
+                                                .value,
                                         );
                                     }}
                                     placeholder="اشرح محتاج يتعمل إيه وأي تفاصيل ممكن تساعد الصنايعي يفهم الشغلانة..."
@@ -1179,7 +1197,8 @@ export default function CreateJobPage() {
                                                 "budget",
                                             );
                                             setBudget(
-                                                event.target.value,
+                                                event.target
+                                                    .value,
                                             );
                                         }}
                                         placeholder="مثال: 100"
@@ -1240,21 +1259,22 @@ export default function CreateJobPage() {
                                     </h2>
 
                                     <span className="text-xs text-muted-foreground">
-                                        من ملفك
+                                        من موقعك
                                     </span>
                                 </div>
 
                                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                    منطقتك هتساعد الصنايعي
-                                    يعرف مكان الشغل قبل ما
-                                    يوافق عليه.
+                                    موقعك هيساعد الصنايعية
+                                    يعرفوا مكان الشغل
+                                    ويحددوا الصنايعية
+                                    القريبين منك.
                                 </p>
                             </div>
                         </div>
 
                         <Separator className="my-5" />
 
-                        {hasArea ? (
+                        {hasLocation ? (
                             <div className="flex items-center justify-between rounded-lg border p-4">
                                 <div className="flex items-center gap-3">
                                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600">
@@ -1263,13 +1283,11 @@ export default function CreateJobPage() {
 
                                     <div>
                                         <p className="text-xs text-muted-foreground">
-                                            المنطقة
+                                            الموقع
                                         </p>
 
                                         <p className="mt-1 text-sm font-medium">
-                                            {
-                                                clientProfile.area
-                                            }
+                                            تم تحديد موقعك
                                         </p>
                                     </div>
                                 </div>
@@ -1291,13 +1309,13 @@ export default function CreateJobPage() {
 
                                     <div>
                                         <p className="text-sm font-medium">
-                                            لازم تحدد منطقتك أولاً
+                                            لازم تحدد موقعك أولاً
                                         </p>
 
                                         <p className="mt-1 text-sm leading-6 text-muted-foreground">
                                             مش هتقدر تنشر شغلانة
-                                            قبل ما تضيف منطقتك
-                                            في ملفك الشخصي.
+                                            قبل ما تحدد موقعك
+                                            من ملفك الشخصي.
                                         </p>
 
                                         <Link
@@ -1308,7 +1326,7 @@ export default function CreateJobPage() {
                                                 type="button"
                                                 size="sm"
                                             >
-                                                إضافة المنطقة
+                                                تحديد الموقع
                                             </Button>
                                         </Link>
                                     </div>
@@ -1413,9 +1431,9 @@ export default function CreateJobPage() {
                             <p className="mt-1 text-xs leading-5 text-muted-foreground">
                                 {isTargetedOffer
                                     ? "راجع تفاصيل الشغلانة والميزانية قبل إرسال العرض."
-                                    : hasArea
-                                      ? "بعد النشر هتظهر الشغلانة للصنايعية المناسبين في منطقتك."
-                                      : "أضف منطقتك أولاً عشان تقدر تنشر الشغلانة."}
+                                    : hasLocation
+                                      ? "بعد النشر هتظهر الشغلانة للصنايعية المناسبين بالقرب منك."
+                                      : "حدد موقعك أولاً عشان تقدر تنشر الشغلانة."}
                             </p>
                         </div>
 

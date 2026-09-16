@@ -65,8 +65,8 @@ export default function ClientDashboardIndex() {
             const [
                 totalJobsResult,
                 openJobsResult,
-                inProgressResult,
-                completedResult,
+                inProgressJobsResult,
+                completedJobsResult,
             ] = await Promise.all([
                 supabase
                     .from("jobs")
@@ -120,25 +120,27 @@ export default function ClientDashboardIndex() {
                 );
             }
 
-            if (inProgressResult.error) {
+            if (inProgressJobsResult.error) {
                 console.error(
                     "Failed to load in-progress jobs:",
-                    inProgressResult.error,
+                    inProgressJobsResult.error,
                 );
             }
 
-            if (completedResult.error) {
+            if (completedJobsResult.error) {
                 console.error(
                     "Failed to load completed jobs:",
-                    completedResult.error,
+                    completedJobsResult.error,
                 );
             }
 
             setStats({
                 totalJobs: totalJobsResult.count ?? 0,
                 openJobs: openJobsResult.count ?? 0,
-                inProgress: inProgressResult.count ?? 0,
-                completed: completedResult.count ?? 0,
+                inProgress:
+                    inProgressJobsResult.count ?? 0,
+                completed:
+                    completedJobsResult.count ?? 0,
             });
 
             setStatsLoading(false);
@@ -161,18 +163,19 @@ export default function ClientDashboardIndex() {
             completed: Boolean(clientProfile?.phone),
         },
         {
-            label: "تحديد المنطقة",
-            completed: Boolean(clientProfile?.area),
-        },
-        {
             label: "تحديد النوع",
             completed: Boolean(clientProfile?.gender),
         },
+        {
+            label: "تحديد الموقع",
+            completed: Boolean(profile?.location),
+        },
     ];
 
-    const completedSteps = onboardingSteps.filter(
-        (step) => step.completed,
-    ).length;
+    const completedSteps =
+        onboardingSteps.filter(
+            (step) => step.completed,
+        ).length;
 
     const onboardingPercentage = Math.round(
         (completedSteps / onboardingSteps.length) * 100,
@@ -189,7 +192,9 @@ export default function ClientDashboardIndex() {
                     <h1 className="truncate text-2xl font-bold">
                         {isLoading
                             ? "..."
-                            : `مرحباً ${profile?.full_name || ""}`}
+                            : `مرحباً ${
+                                  profile?.full_name || ""
+                              }`}
                     </h1>
 
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -211,17 +216,19 @@ export default function ClientDashboardIndex() {
 
             <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                 {/* Sidebar */}
-                <div className="space-y-4">
-                    {/* Profile */}
+                <aside className="space-y-4">
+                    {/* Profile card */}
                     <Card>
                         <CardContent className="p-5">
                             <div className="flex items-start gap-3">
                                 <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-muted">
                                     {profile?.avatar_url ? (
                                         <img
-                                            src={profile.avatar_url}
+                                            src={
+                                                profile.avatar_url
+                                            }
                                             alt={
-                                                profile?.full_name ||
+                                                profile.full_name ||
                                                 "صورة الملف الشخصي"
                                             }
                                             className="h-full w-full object-cover"
@@ -241,19 +248,24 @@ export default function ClientDashboardIndex() {
 
                                     <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                                         <BadgeCheck className="h-3.5 w-3.5 shrink-0" />
-                                        <span>حساب عميل</span>
+                                        <span>
+                                            حساب عميل
+                                        </span>
                                     </div>
                                 </div>
                             </div>
 
                             <Separator className="my-4" />
 
-                            <div className="space-y-2 text-sm">
+                            <div className="space-y-1 text-sm">
                                 <Link
                                     href="/profile"
                                     className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
-                                    <span>الملف العام</span>
+                                    <span>
+                                        الملف العام
+                                    </span>
+
                                     <UserRound className="h-4 w-4 text-muted-foreground" />
                                 </Link>
 
@@ -261,7 +273,10 @@ export default function ClientDashboardIndex() {
                                     href="/chats"
                                     className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
-                                    <span>الرسائل</span>
+                                    <span>
+                                        الرسائل
+                                    </span>
+
                                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
                                 </Link>
 
@@ -269,14 +284,17 @@ export default function ClientDashboardIndex() {
                                     href="/client/find"
                                     className="flex items-center justify-between rounded-md px-2 py-2 transition-colors hover:bg-muted"
                                 >
-                                    <span>البحث عن صنايعي</span>
+                                    <span>
+                                        البحث عن صنايعي
+                                    </span>
+
                                     <Search className="h-4 w-4 text-muted-foreground" />
                                 </Link>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Find Craftsman */}
+                    {/* Find craftsman */}
                     <Link
                         href="/client/find"
                         className="block"
@@ -294,7 +312,7 @@ export default function ClientDashboardIndex() {
                                         </p>
 
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            ابحث عن أفضل الصنايعية في منطقتك
+                                            ابحث عن صنايعية قريبين منك
                                         </p>
                                     </div>
                                 </div>
@@ -317,12 +335,18 @@ export default function ClientDashboardIndex() {
 
                                     <p className="mt-1 text-xs text-muted-foreground">
                                         {completedSteps} من{" "}
-                                        {onboardingSteps.length} مكتملة
+                                        {
+                                            onboardingSteps.length
+                                        }{" "}
+                                        مكتملة
                                     </p>
                                 </div>
 
                                 <span className="text-sm font-semibold text-primary">
-                                    {onboardingPercentage}%
+                                    {
+                                        onboardingPercentage
+                                    }
+                                    %
                                 </span>
                             </div>
 
@@ -336,38 +360,44 @@ export default function ClientDashboardIndex() {
                             </div>
 
                             <div className="mt-5 space-y-3">
-                                {onboardingSteps.map((step) => (
-                                    <div
-                                        key={step.label}
-                                        className="flex items-center gap-3"
-                                    >
-                                        {step.completed ? (
-                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                                <span className="text-xs">
-                                                    ✓
-                                                </span>
-                                            </span>
-                                        ) : (
-                                            <span className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/30" />
-                                        )}
-
-                                        <span
-                                            className={
-                                                step.completed
-                                                    ? "text-sm"
-                                                    : "text-sm text-muted-foreground"
-                                            }
+                                {onboardingSteps.map(
+                                    (step) => (
+                                        <div
+                                            key={step.label}
+                                            className="flex items-center gap-3"
                                         >
-                                            {step.label}
-                                        </span>
-                                    </div>
-                                ))}
+                                            {step.completed ? (
+                                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                                    <span className="text-xs">
+                                                        ✓
+                                                    </span>
+                                                </span>
+                                            ) : (
+                                                <span className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/30" />
+                                            )}
+
+                                            <span
+                                                className={
+                                                    step.completed
+                                                        ? "text-sm"
+                                                        : "text-sm text-muted-foreground"
+                                                }
+                                            >
+                                                {
+                                                    step.label
+                                                }
+                                            </span>
+                                        </div>
+                                    ),
+                                )}
                             </div>
 
                             {completedSteps <
                                 onboardingSteps.length && (
                                 <Link
-                                    href={editProfileHref}
+                                    href={
+                                        editProfileHref
+                                    }
                                     className="mt-5 block"
                                 >
                                     <Button
@@ -381,10 +411,10 @@ export default function ClientDashboardIndex() {
                             )}
                         </CardContent>
                     </Card>
-                </div>
+                </aside>
 
                 {/* Main */}
-                <div className="space-y-6">
+                <main className="space-y-6">
                     {/* Stats */}
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <StatCard
@@ -416,19 +446,20 @@ export default function ClientDashboardIndex() {
                         />
                     </div>
 
-                    {/* Getting started */}
+                    {/* Main CTA */}
                     <Card>
                         <CardContent className="p-6">
                             <div className="flex items-start justify-between gap-4">
-                                <div>
+                                <div className="min-w-0">
                                     <h2 className="font-semibold">
-                                        ابدأ في العثور على الصنايعي المناسب
+                                        محتاج صنايعي؟
                                     </h2>
 
-                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                        ابحث عن الصنايعية حسب التخصص
-                                        والمنطقة ثم تواصل مع الشخص المناسب
-                                        لتنفيذ شغلك.
+                                    <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                                        ابحث عن الصنايعي المناسب
+                                        لشغلك، شوف المتاحين
+                                        وتواصل مع الشخص المناسب
+                                        لتنفيذ الطلب.
                                     </p>
                                 </div>
 
@@ -451,30 +482,31 @@ export default function ClientDashboardIndex() {
                                 </Link>
 
                                 <Link
-                                    href="/chats"
+                                    href="/client/job/new"
                                     className="w-full sm:w-auto"
                                 >
                                     <Button
                                         variant="outline"
-                                        className="w-full gap-2 sm:w-auto"
+                                        className="w-full sm:w-auto"
                                     >
-                                        <MessageSquare className="h-4 w-4" />
-                                        الرسائل
+                                        اعمل شغلانة جديدة
                                     </Button>
                                 </Link>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Profile information */}
+                    {/* Account information */}
                     <Card>
                         <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between gap-4">
                                 <h2 className="font-semibold">
                                     معلومات الحساب
                                 </h2>
 
-                                <Link href={editProfileHref}>
+                                <Link
+                                    href={editProfileHref}
+                                >
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -499,23 +531,25 @@ export default function ClientDashboardIndex() {
                                 />
 
                                 <InfoItem
-                                    icon={MapPin}
-                                    label="المنطقة"
-                                    value={
-                                        clientProfile?.area ||
-                                        "غير مضافة"
-                                    }
-                                />
-
-                                <InfoItem
                                     icon={VenusAndMars}
                                     label="النوع"
                                     value={
                                         clientProfile?.gender
                                             ? genderText[
-                                                  clientProfile.gender
+                                                  clientProfile
+                                                      .gender
                                               ] ||
                                               clientProfile.gender
+                                            : "غير محدد"
+                                    }
+                                />
+
+                                <InfoItem
+                                    icon={MapPin}
+                                    label="الموقع"
+                                    value={
+                                        profile?.location
+                                            ? "تم تحديد الموقع"
                                             : "غير محدد"
                                     }
                                 />
@@ -536,41 +570,41 @@ export default function ClientDashboardIndex() {
                     {/* Location */}
                     <Card>
                         <CardContent className="p-6">
-                            <div className="mb-4 flex items-center justify-between gap-4">
+                            <div className="flex items-start justify-between gap-4">
                                 <div>
                                     <h2 className="font-semibold">
-                                        منطقتك
+                                        موقعك
                                     </h2>
 
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        سنستخدم منطقتك لمساعدتك في العثور
-                                        على صنايعية قريبين منك
+                                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                        نستخدم موقعك للعثور على
+                                        الصنايعية القريبين منك.
+                                        موقعك الدقيق لا يظهر
+                                        للمستخدمين الآخرين.
                                     </p>
                                 </div>
 
-                                <Link href={editProfileHref}>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                    >
-                                        تعديل
-                                    </Button>
-                                </Link>
+                                <MapPin className="hidden h-5 w-5 shrink-0 text-primary sm:block" />
                             </div>
 
-                            {clientProfile?.area ? (
+                            <Separator className="my-5" />
+
+                            {profile?.location ? (
                                 <div className="flex items-center gap-3 rounded-lg border p-4">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                         <MapPin className="h-5 w-5" />
                                     </div>
 
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            المنطقة الحالية
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium">
+                                            تم تحديد موقعك
                                         </p>
 
-                                        <p className="mt-1 text-sm font-medium">
-                                            {clientProfile.area}
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            موقعك محفوظ بشكل
+                                            خاص لاستخدامه في
+                                            البحث عن الخدمات
+                                            القريبة.
                                         </p>
                                     </div>
                                 </div>
@@ -579,8 +613,22 @@ export default function ClientDashboardIndex() {
                                     <MapPin className="mx-auto h-5 w-5 text-muted-foreground" />
 
                                     <p className="mt-2 text-sm text-muted-foreground">
-                                        لم تتم إضافة منطقتك بعد
+                                        لم يتم تحديد موقعك بعد
                                     </p>
+
+                                    <Link
+                                        href={
+                                            editProfileHref
+                                        }
+                                        className="mt-4 inline-block"
+                                    >
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                        >
+                                            تحديد الموقع
+                                        </Button>
+                                    </Link>
                                 </div>
                             )}
                         </CardContent>
@@ -588,31 +636,42 @@ export default function ClientDashboardIndex() {
 
                     {/* Activity */}
                     <Card>
-                        <CardContent className="flex items-center justify-between gap-4 p-6">
+                        <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 className="font-semibold">
                                     آخر النشاط
                                 </h2>
 
-                                {stats.totalJobs > 0 ? (
+                                {statsLoading ? (
+                                    <div className="mt-2 h-4 w-40 animate-pulse rounded bg-muted" />
+                                ) : stats.totalJobs > 0 ? (
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        لديك {stats.totalJobs}{" "}
-                                        {stats.totalJobs === 1
-                                            ? "طلب"
-                                            : "طلبات"}{" "}
+                                        لديك{" "}
+                                        {
+                                            stats.totalJobs
+                                        }{" "}
+                                        طلب
+                                        {stats.totalJobs ===
+                                        1
+                                            ? ""
+                                            : "ات"}{" "}
                                         في حسابك.
                                     </p>
                                 ) : (
                                     <p className="mt-1 text-sm text-muted-foreground">
-                                        لم تنشر أي طلبات حتى الآن.
+                                        لم تنشر أي طلبات حتى
+                                        الآن.
                                     </p>
                                 )}
                             </div>
 
-                            <Link href="/client/my-job-offers">
+                            <Link
+                                href="/client/my-job-offers"
+                                className="shrink-0"
+                            >
                                 <Button
                                     variant="outline"
-                                    className="gap-2"
+                                    className="w-full gap-2 sm:w-auto"
                                 >
                                     <Search className="h-4 w-4" />
                                     طلباتي
@@ -620,7 +679,7 @@ export default function ClientDashboardIndex() {
                             </Link>
                         </CardContent>
                     </Card>
-                </div>
+                </main>
             </div>
         </div>
     );
@@ -638,7 +697,10 @@ function StatCard({
     href: string;
 }) {
     return (
-        <Link href={href} className="block">
+        <Link
+            href={href}
+            className="block"
+        >
             <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/20">
                 <CardContent className="p-4">
                     <p className="text-sm text-muted-foreground">

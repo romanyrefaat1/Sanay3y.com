@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import {
+    Search,
+    SlidersHorizontal,
+    X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +11,9 @@ import { Label } from "@/components/ui/label";
 
 type FindFiltersProps = {
     service: string;
-    area: string;
     minBudget: string;
     maxBudget: string;
+    distance: string;
 };
 
 const SERVICE_TYPES = [
@@ -26,24 +30,62 @@ const SERVICE_TYPES = [
     "أخرى",
 ];
 
-function buildHref(overrides: Partial<FindFiltersProps>) {
+const DISTANCE_OPTIONS = [
+    { value: "2", label: "لحد 2 كم" },
+    { value: "4", label: "لحد 4 كم" },
+    { value: "6", label: "لحد 6 كم" },
+    { value: "10", label: "لحد 10 كم" },
+    { value: "20", label: "لحد 20 كم" },
+];
+
+const DEFAULT_DISTANCE = "6";
+
+function buildHref(
+    overrides: Partial<FindFiltersProps>
+) {
     const merged = {
         service: overrides.service ?? "",
-        area: overrides.area ?? "",
         minBudget: overrides.minBudget ?? "",
         maxBudget: overrides.maxBudget ?? "",
+        distance:
+            overrides.distance ?? DEFAULT_DISTANCE,
     };
 
     const params = new URLSearchParams();
 
-    if (merged.service) params.set("service", merged.service);
-    if (merged.area) params.set("area", merged.area);
-    if (merged.minBudget) params.set("minBudget", merged.minBudget);
-    if (merged.maxBudget) params.set("maxBudget", merged.maxBudget);
+    if (merged.service) {
+        params.set("service", merged.service);
+    }
+
+    if (merged.minBudget) {
+        params.set(
+            "minBudget",
+            merged.minBudget
+        );
+    }
+
+    if (merged.maxBudget) {
+        params.set(
+            "maxBudget",
+            merged.maxBudget
+        );
+    }
+
+    if (
+        merged.distance &&
+        merged.distance !== DEFAULT_DISTANCE
+    ) {
+        params.set(
+            "distance",
+            merged.distance
+        );
+    }
 
     const query = params.toString();
 
-    return `/craftsman/find${query ? `?${query}` : ""}`;
+    return `/craftsman/find${
+        query ? `?${query}` : ""
+    }`;
 }
 
 function pillClass(active: boolean) {
@@ -60,45 +102,33 @@ function listItemClass(active: boolean) {
 
 export default function FindFilters({
     service,
-    area,
     minBudget,
     maxBudget,
+    distance,
 }: FindFiltersProps) {
-    const hasActiveFilters = Boolean(service || area || minBudget || maxBudget);
+    const currentDistance =
+        distance || DEFAULT_DISTANCE;
+
+    const hasActiveFilters = Boolean(
+        service ||
+            minBudget ||
+            maxBudget ||
+            currentDistance !== DEFAULT_DISTANCE
+    );
 
     return (
         <div className="flex w-full flex-col gap-4 lg:w-72 lg:shrink-0">
-            {/* Search bar — searches area (service stays exact-match via pill chips) */}
-            <form
-                method="GET"
-                action="/craftsman/find"
-                className="relative"
-            >
-                {service && (
-                    <input type="hidden" name="service" value={service} />
-                )}
-                {minBudget && (
-                    <input type="hidden" name="minBudget" value={minBudget} />
-                )}
-                {maxBudget && (
-                    <input type="hidden" name="maxBudget" value={maxBudget} />
-                )}
-
-                <Search className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
-                <Input
-                    name="area"
-                    defaultValue={area}
-                    placeholder="ابحث بالمنطقة..."
-                    className="h-12 rounded-lg bg-card pr-11 text-[15px] shadow-sm"
-                />
-            </form>
-
-            {/* Service pill chips — mobile scroll row */}
+            {/* Mobile service filters */}
             <div className="flex flex-wrap gap-2 lg:hidden">
                 <Link
-                    href={buildHref({ area, minBudget, maxBudget })}
-                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${pillClass(!service)}`}
+                    href={buildHref({
+                        minBudget,
+                        maxBudget,
+                        distance: currentDistance,
+                    })}
+                    className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${pillClass(
+                        !service
+                    )}`}
                 >
                     الكل
                 </Link>
@@ -108,22 +138,25 @@ export default function FindFilters({
                         key={type}
                         href={buildHref({
                             service: type,
-                            area,
                             minBudget,
                             maxBudget,
+                            distance: currentDistance,
                         })}
-                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${pillClass(service === type)}`}
+                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${pillClass(
+                            service === type
+                        )}`}
                     >
                         {type}
                     </Link>
                 ))}
             </div>
 
-            {/* Sidebar filter panel */}
+            {/* Filter panel */}
             <div className="rounded-lg border border-border bg-card p-5">
                 <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <SlidersHorizontal className="size-4 text-muted-foreground" />
+
                         <h2 className="text-[15px] font-bold text-foreground">
                             تصفية النتائج
                         </h2>
@@ -144,7 +177,7 @@ export default function FindFilters({
                     حدد اللي يناسب شغلك
                 </p>
 
-                {/* Desktop service list */}
+                {/* Desktop service filters */}
                 <div className="mb-5 hidden border-b border-border pb-5 lg:block">
                     <p className="mb-2.5 text-sm font-medium text-foreground">
                         نوع الخدمة
@@ -152,8 +185,14 @@ export default function FindFilters({
 
                     <div className="flex flex-col gap-1">
                         <Link
-                            href={buildHref({ area, minBudget, maxBudget })}
-                            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${listItemClass(!service)}`}
+                            href={buildHref({
+                                minBudget,
+                                maxBudget,
+                                distance: currentDistance,
+                            })}
+                            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${listItemClass(
+                                !service
+                            )}`}
                         >
                             الكل
                         </Link>
@@ -163,11 +202,13 @@ export default function FindFilters({
                                 key={type}
                                 href={buildHref({
                                     service: type,
-                                    area,
                                     minBudget,
                                     maxBudget,
+                                    distance: currentDistance,
                                 })}
-                                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${listItemClass(service === type)}`}
+                                className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${listItemClass(
+                                    service === type
+                                )}`}
                             >
                                 {type}
                             </Link>
@@ -181,22 +222,47 @@ export default function FindFilters({
                     className="space-y-4"
                 >
                     {service && (
-                        <input type="hidden" name="service" value={service} />
+                        <input
+                            type="hidden"
+                            name="service"
+                            value={service}
+                        />
                     )}
 
+                    {/* Distance */}
                     <div className="space-y-1.5">
-                        <Label htmlFor="area">المنطقة</Label>
+                        <Label htmlFor="distance">
+                            المسافة
+                        </Label>
 
-                        <Input
-                            id="area"
-                            name="area"
-                            defaultValue={area}
-                            placeholder="مثال: الجيزة، فيصل"
-                        />
+                        <select
+                            id="distance"
+                            name="distance"
+                            defaultValue={currentDistance}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus:ring-2 focus:ring-ring"
+                        >
+                            {DISTANCE_OPTIONS.map(
+                                (option) => (
+                                    <option
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </option>
+                                )
+                            )}
+                        </select>
+
+                        <p className="text-xs leading-5 text-muted-foreground">
+                            المسافة محسوبة من موقعك إلى موقع العميل.
+                        </p>
                     </div>
 
+                    {/* Budget */}
                     <div className="space-y-1.5">
-                        <Label>الميزانية (ج.م)</Label>
+                        <Label>
+                            الميزانية (ج.م)
+                        </Label>
 
                         <div className="flex items-center gap-2">
                             <Input
@@ -221,7 +287,10 @@ export default function FindFilters({
                         </div>
                     </div>
 
-                    <Button type="submit" className="w-full">
+                    <Button
+                        type="submit"
+                        className="w-full"
+                    >
                         <Search className="size-4" />
                         بحث
                     </Button>

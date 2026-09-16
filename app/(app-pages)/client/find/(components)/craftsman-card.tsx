@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-    BadgeCheck,
     BriefcaseBusiness,
     CheckCircle2,
     Clock3,
@@ -16,14 +15,13 @@ type Craftsman = {
     avatar_url: string | null;
     bio: string | null;
     experience_years: number | null;
-    areas: string[];
-    shop_address: string | null;
     work_type: string | null;
     verification_status: "pending" | "verified" | "rejected";
     is_available: boolean;
     average_response_time_minutes: number | null;
     response_rate: number;
     completion_rate: number;
+    distance_km: number | null;
 };
 
 function formatExperience(years: number | null) {
@@ -31,6 +29,7 @@ function formatExperience(years: number | null) {
     if (years === 0) return "أقل من سنة";
     if (years === 1) return "سنة واحدة";
     if (years === 2) return "سنتان";
+
     return `${years} سنوات`;
 }
 
@@ -43,14 +42,38 @@ function formatResponseTime(minutes: number | null) {
 
     const hours = Math.round(minutes / 60);
 
-    return hours === 1 ? "ساعة تقريباً" : `${hours} ساعات تقريباً`;
+    return hours === 1
+        ? "ساعة تقريباً"
+        : `${hours} ساعات تقريباً`;
+}
+
+function formatDistance(distanceKm: number | null) {
+    if (
+        distanceKm === null ||
+        !Number.isFinite(distanceKm)
+    ) {
+        return null;
+    }
+
+    if (distanceKm < 1) {
+        return "أقل من 1 كم منك";
+    }
+
+    if (distanceKm < 10) {
+        return `${distanceKm.toFixed(1)} كم منك`;
+    }
+
+    return `${Math.round(distanceKm)} كم منك`;
 }
 
 function getInitials(name: string) {
     const words = name.trim().split(/\s+/);
 
     if (!words.length) return "ص";
-    if (words.length === 1) return words[0].slice(0, 2);
+
+    if (words.length === 1) {
+        return words[0].slice(0, 2);
+    }
 
     return `${words[0][0] || ""}${words[1][0] || ""}`;
 }
@@ -64,7 +87,9 @@ export default function CraftsmanCard({
         craftsman.average_response_time_minutes
     );
 
-    const hasAreas = craftsman.areas.length > 0;
+    const distance = formatDistance(
+        craftsman.distance_km
+    );
 
     return (
         <div className="rounded-lg border border-border bg-card p-6 transition-colors hover:border-primary/30 hover:shadow-sm">
@@ -80,27 +105,30 @@ export default function CraftsmanCard({
                         />
                     ) : (
                         <div className="flex size-16 items-center justify-center rounded-full bg-muted text-base font-semibold text-muted-foreground">
-                            {getInitials(craftsman.full_name)}
+                            {getInitials(
+                                craftsman.full_name
+                            )}
                         </div>
                     )}
 
                     <span
                         className="absolute bottom-0 left-0 size-4 rounded-full border-2 border-card"
                         style={{
-                            backgroundColor: craftsman.is_available
-                                ? "hsl(var(--available))"
-                                : "hsl(var(--unavailable))",
+                            backgroundColor:
+                                craftsman.is_available
+                                    ? "hsl(var(--available))"
+                                    : "hsl(var(--unavailable))",
                         }}
                     />
                 </div>
 
                 <div className="min-w-0 flex-1">
+                    {/* Meta */}
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-sm text-muted-foreground">
                         {craftsman.work_type && (
                             <Badge variant="secondary">
                                 {craftsman.work_type}
                             </Badge>
-
                         )}
 
                         {craftsman.is_available && (
@@ -112,18 +140,15 @@ export default function CraftsmanCard({
                             </Badge>
                         )}
 
-                        {hasAreas && (
-                            <span className="flex min-w-0 items-center gap-1.5">
+                        {distance && (
+                            <span className="inline-flex items-center gap-1.5">
                                 <MapPin className="size-3.5 shrink-0" />
-                                <span className="truncate">
-                                    {craftsman.areas.slice(0, 3).join("، ")}
-                                    {craftsman.areas.length > 3 &&
-                                        ` +${craftsman.areas.length - 3}`}
-                                </span>
+                                {distance}
                             </span>
                         )}
                     </div>
 
+                    {/* Name + action */}
                     <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <Link
                             href={`/profile/${craftsman.id}`}
@@ -132,12 +157,6 @@ export default function CraftsmanCard({
                             <span className="truncate text-lg font-bold text-foreground transition-colors group-hover:text-primary">
                                 {craftsman.full_name}
                             </span>
-
-                            {/* <BadgeCheck
-                                className="size-5 shrink-0"
-                                style={{ color: "hsl(var(--verified))" }}
-                                aria-label="حساب موثق"
-                            /> */}
                         </Link>
 
                         <Button
@@ -146,22 +165,28 @@ export default function CraftsmanCard({
                             size="sm"
                             className="shrink-0"
                         >
-                            <Link href={`/profile/${craftsman.id}`}>
+                            <Link
+                                href={`/profile/${craftsman.id}`}
+                            >
                                 عرض الملف الشخصي
                             </Link>
                         </Button>
                     </div>
 
+                    {/* Bio */}
                     {craftsman.bio && (
                         <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
                             {craftsman.bio}
                         </p>
                     )}
 
+                    {/* Stats */}
                     <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-sm text-muted-foreground">
                         <span className="inline-flex items-center gap-1.5">
                             <BriefcaseBusiness className="size-4 shrink-0" />
-                            {formatExperience(craftsman.experience_years)}
+                            {formatExperience(
+                                craftsman.experience_years
+                            )}
                         </span>
 
                         {responseTime && (

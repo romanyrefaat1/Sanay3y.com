@@ -19,7 +19,7 @@ export default function CraftsmanSignupPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              أنشئ حسابك كصنايعي وتواصل مع العملاء القريبين منك.
+              أنشئ حسابك كصنايعي وابدأ في التواصل مع العملاء.
             </p>
           </div>
         </div>

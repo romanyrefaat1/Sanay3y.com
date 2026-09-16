@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,28 +18,56 @@ import { useRouter } from "next/navigation";
 
 export function CraftsmanSignupForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [error, setError] = useState("");
-  const router = useRouter()
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
-  const [areas, setAreas] = useState([""]);
+  const router = useRouter();
 
-  function addArea() {
-    setAreas((current) => [...current, ""]);
+  async function getLocation() {
+    setError("");
+    setIsGettingLocation(true);
+
+    if (!navigator.geolocation) {
+      setError("المتصفح لا يدعم تحديد الموقع.");
+      setIsGettingLocation(false);
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
+          });
+        }
+      );
+
+      setLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      });
+    } catch {
+      setError(
+        "يجب السماح بالوصول إلى موقعك لإنشاء الحساب. يرجى تفعيل الموقع والمحاولة مرة أخرى."
+      );
+    } finally {
+      setIsGettingLocation(false);
+    }
   }
 
-  function removeArea(index: number) {
-    setAreas((current) => current.filter((_, i) => i !== index));
-  }
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-  function updateArea(index: number, value: string) {
-    setAreas((current) =>
-      current.map((area, i) => (i === index ? value : area))
-    );
-  }
-
-  async function handleSubmit(formData: FormData) {
     setIsLoading(true);
     setError("");
+
+    const formData = new FormData(event.currentTarget);
 
     const firstName = String(formData.get("firstName") || "").trim();
     const secondName = String(formData.get("secondName") || "").trim();
@@ -48,21 +76,28 @@ export function CraftsmanSignupForm() {
     const phone = String(formData.get("phone") || "").trim();
     const bio = String(formData.get("bio") || "").trim();
     const experience = String(formData.get("experience") || "").trim();
-    const shopAddress = String(formData.get("shopAddress") || "").trim();
 
-    const selectedAreas = formData
-      .getAll("areas")
-      .map((area) => String(area).trim())
-      .filter(Boolean);
-
-    if (!firstName || !secondName || !email || !password) {
+    if (!firstName || !secondName || !email || !password || !phone) {
       setError("من فضلك املأ جميع الحقول المطلوبة.");
       setIsLoading(false);
       return;
     }
 
-    if (selectedAreas.length === 0) {
-      setError("من فضلك أضف منطقة واحدة على الأقل تعمل بها.");
+    if (!location) {
+      setError("من فضلك حدد موقعك أولًا.");
+      setIsLoading(false);
+      return;
+    }
+
+    const experienceYears = experience
+      ? Number(experience)
+      : null;
+
+    if (
+      experienceYears !== null &&
+      (!Number.isFinite(experienceYears) || experienceYears < 0)
+    ) {
+      setError("سنوات الخبرة غير صالحة.");
       setIsLoading(false);
       return;
     }
@@ -74,6 +109,11 @@ export function CraftsmanSignupForm() {
       password,
       fullName,
       role: "craftsman",
+      latitude: location.latitude,
+      longitude: location.longitude,
+      phone,
+      bio: bio || undefined,
+      experienceYears,
     });
 
     if (!result.success) {
@@ -82,31 +122,21 @@ export function CraftsmanSignupForm() {
       return;
     }
 
-    // Then we'll create craftsman_profiles after signup.
-    // Save:
-    // - phone
-    // - bio
-    // - experience
-    // - areas
-    // - shopAddress
-    //
-    // Verification should happen in a separate onboarding step.
-
     router.push("/confirm");
   }
 
   return (
-    <Card className="border-border/60 shadow-sm"  >
+    <Card className="border-border/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-xl">إنشاء حسابك</CardTitle>
       </CardHeader>
 
       <CardContent>
-        <form action={handleSubmit} className="space-y-5">
-          {/* Name */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">الاسم الأول</Label>
+
               <Input
                 id="firstName"
                 name="firstName"
@@ -118,6 +148,7 @@ export function CraftsmanSignupForm() {
 
             <div className="space-y-2">
               <Label htmlFor="secondName">الاسم الثاني</Label>
+
               <Input
                 id="secondName"
                 name="secondName"
@@ -128,7 +159,6 @@ export function CraftsmanSignupForm() {
             </div>
           </div>
 
-          {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">البريد الإلكتروني</Label>
 
@@ -143,7 +173,6 @@ export function CraftsmanSignupForm() {
             />
           </div>
 
-          {/* Password */}
           <div className="space-y-2">
             <Label htmlFor="password">كلمة المرور</Label>
 
@@ -159,12 +188,8 @@ export function CraftsmanSignupForm() {
             />
           </div>
 
-          {/* Phone */}
           <div className="space-y-2">
-            <Label htmlFor="phone">
-              رقم الهاتف{" "}
-              <span className="mr-1 text-muted-foreground">(اختياري)</span>
-            </Label>
+            <Label htmlFor="phone">رقم الهاتف</Label>
 
             <Input
               id="phone"
@@ -173,6 +198,7 @@ export function CraftsmanSignupForm() {
               placeholder="01XXXXXXXXX"
               autoComplete="tel"
               dir="ltr"
+              required
             />
 
             <p className="text-xs text-muted-foreground">
@@ -180,11 +206,12 @@ export function CraftsmanSignupForm() {
             </p>
           </div>
 
-          {/* Experience */}
           <div className="space-y-2">
             <Label htmlFor="experience">
               سنوات الخبرة{" "}
-              <span className="mr-1 text-muted-foreground">(اختياري)</span>
+              <span className="mr-1 text-muted-foreground">
+                (اختياري)
+              </span>
             </Label>
 
             <Input
@@ -197,83 +224,12 @@ export function CraftsmanSignupForm() {
             />
           </div>
 
-          {/* Areas */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>المناطق التي تعمل بها</Label>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addArea}
-                className="gap-1.5"
-              >
-                <Plus className="size-4" />
-                إضافة منطقة
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {areas.map((area, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    name="areas"
-                    value={area}
-                    onChange={(event) =>
-                      updateArea(index, event.target.value)
-                    }
-                    placeholder={
-                      index === 0
-                        ? "مثال: مدينة نصر"
-                        : "مثال: مصر الجديدة"
-                    }
-                    required={index === 0}
-                  />
-
-                  {areas.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeArea(index)}
-                      aria-label="حذف المنطقة"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              أضف جميع المناطق التي يمكنك الوصول إليها للعمل.
-            </p>
-          </div>
-
-          {/* Shop Address */}
-          <div className="space-y-2">
-            <Label htmlFor="shopAddress">
-              عنوان المحل{" "}
-              <span className="mr-1 text-muted-foreground">(اختياري)</span>
-            </Label>
-
-            <Input
-              id="shopAddress"
-              name="shopAddress"
-              placeholder="مثال: شارع عباس العقاد، مدينة نصر"
-            />
-
-            <p className="text-xs text-muted-foreground">
-              يمكنك اختيار ما إذا كنت تريد إظهاره للعامة لاحقًا.
-            </p>
-          </div>
-
-          {/* Bio */}
           <div className="space-y-2">
             <Label htmlFor="bio">
               نبذة عنك{" "}
-              <span className="mr-1 text-muted-foreground">(اختياري)</span>
+              <span className="mr-1 text-muted-foreground">
+                (اختياري)
+              </span>
             </Label>
 
             <Textarea
@@ -285,6 +241,46 @@ export function CraftsmanSignupForm() {
             />
           </div>
 
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+            <div className="flex items-start gap-3">
+              <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
+
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">
+                  حدد موقعك
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  نحتاج موقعك الحالي لمساعدتك في العثور على
+                  الشغلانات القريبة منك. موقعك الدقيق لن يظهر
+                  للمستخدمين الآخرين.
+                </p>
+
+                <Button
+                  type="button"
+                  variant={location ? "outline" : "default"}
+                  className="mt-3 w-full gap-2"
+                  onClick={getLocation}
+                  disabled={isGettingLocation || isLoading}
+                >
+                  {location ? (
+                    <>
+                      <Check className="size-4" />
+                      تم تحديد موقعك
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="size-4" />
+                      {isGettingLocation
+                        ? "جاري تحديد موقعك..."
+                        : "تحديد موقعي"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {error && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
@@ -294,7 +290,7 @@ export function CraftsmanSignupForm() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || isGettingLocation}
           >
             {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
           </Button>

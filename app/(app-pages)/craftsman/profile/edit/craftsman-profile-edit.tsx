@@ -20,7 +20,6 @@ import {
     Clock3,
     MapPin,
     Phone,
-    Store,
     UserRound,
 } from "lucide-react";
 import { z } from "zod";
@@ -81,26 +80,6 @@ const craftsmanProfileSchema = z.object({
             "اكتب عدد سنين خبرة صحيح.",
         ),
 
-    areas: z
-        .string()
-        .trim()
-        .max(
-            500,
-            "المناطق طويلة جدًا.",
-        )
-        .optional()
-        .or(z.literal("")),
-
-    shopAddress: z
-        .string()
-        .trim()
-        .max(
-            300,
-            "عنوان مكان العمل طويل جدًا.",
-        )
-        .optional()
-        .or(z.literal("")),
-
     isAvailable: z.boolean(),
 });
 
@@ -109,8 +88,6 @@ type CraftsmanProfileForm = {
     phone: string;
     bio: string;
     experienceYears: string;
-    areas: string;
-    shopAddress: string;
     isAvailable: boolean;
 };
 
@@ -118,9 +95,7 @@ type FieldName =
     | "fullName"
     | "phone"
     | "bio"
-    | "experienceYears"
-    | "areas"
-    | "shopAddress";
+    | "experienceYears";
 
 function getFieldError(
     field: FieldName,
@@ -173,12 +148,6 @@ export default function CraftsmanProfileEditPage() {
     const [experienceYears, setExperienceYears] =
         useState("");
 
-    const [areas, setAreas] =
-        useState("");
-
-    const [shopAddress, setShopAddress] =
-        useState("");
-
     const [isAvailable, setIsAvailable] =
         useState(true);
 
@@ -204,12 +173,6 @@ export default function CraftsmanProfileEditPage() {
     const [showBackDialog, setShowBackDialog] =
         useState(false);
 
-    /*
-     * Back navigation
-     *
-     * Example:
-     * /craftsman/profile/edit?backTo=%2Fjobs%2F123&name=%D8%A7%D9%84%D8%B4%D8%BA%D9%84%D8%A7%D9%86%D8%A9
-     */
     const backToParam =
         searchParams.get("backTo");
 
@@ -227,8 +190,24 @@ export default function CraftsmanProfileEditPage() {
     /*
      * Fill the form from the existing profile.
      *
-     * craftsmanProfile may be null when the account
-     * has never created its craftsman profile.
+     * Current craftsman profile fields used here:
+     *
+     * profiles:
+     * - full_name
+     * - avatar_url
+     *
+     * craftsman_profiles:
+     * - phone
+     * - bio
+     * - experience_years
+     * - is_available
+     * - verification_status
+     *
+     * Location is stored privately in:
+     * profiles.location
+     *
+     * areas and shop_address are intentionally
+     * not edited here anymore.
      */
     useEffect(() => {
         if (!profile) {
@@ -258,17 +237,6 @@ export default function CraftsmanProfileEditPage() {
                 : "",
         );
 
-        setAreas(
-            craftsmanProfile?.areas?.join(
-                "، ",
-            ) ?? "",
-        );
-
-        setShopAddress(
-            craftsmanProfile?.shop_address ??
-                "",
-        );
-
         setIsAvailable(
             craftsmanProfile?.is_available ??
                 true,
@@ -285,8 +253,6 @@ export default function CraftsmanProfileEditPage() {
                 phone,
                 bio,
                 experienceYears,
-                areas,
-                shopAddress,
                 isAvailable,
             }),
             [
@@ -294,8 +260,6 @@ export default function CraftsmanProfileEditPage() {
                 phone,
                 bio,
                 experienceYears,
-                areas,
-                shopAddress,
                 isAvailable,
             ],
         );
@@ -324,18 +288,6 @@ export default function CraftsmanProfileEditPage() {
             values,
         );
 
-    const areasError =
-        getFieldError(
-            "areas",
-            values,
-        );
-
-    const shopAddressError =
-        getFieldError(
-            "shopAddress",
-            values,
-        );
-
     const markTouched = (
         field: FieldName,
     ) => {
@@ -348,6 +300,9 @@ export default function CraftsmanProfileEditPage() {
         setSuccess("");
     };
 
+    /*
+     * Local avatar preview.
+     */
     const avatarPreview =
         useMemo(() => {
             if (!avatar) {
@@ -384,16 +339,21 @@ export default function CraftsmanProfileEditPage() {
             return;
         }
 
-        if (
-            ![
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            ].includes(file.type)
-        ) {
+        const allowedTypes = [
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            setAvatar(null);
+
             setError(
                 "من فضلك اختر صورة بصيغة JPG أو PNG أو WEBP.",
             );
+
+            event.target.value = "";
             return;
         }
 
@@ -401,9 +361,13 @@ export default function CraftsmanProfileEditPage() {
             file.size >
             5 * 1024 * 1024
         ) {
+            setAvatar(null);
+
             setError(
                 "حجم الصورة يجب ألا يتجاوز 5 ميجابايت.",
             );
+
+            event.target.value = "";
             return;
         }
 
@@ -417,15 +381,57 @@ export default function CraftsmanProfileEditPage() {
             return null;
         }
 
+        const {
+            data: {
+                user: authUser,
+            },
+            error: authError,
+        } =
+            await supabase.auth.getUser();
+
+        if (authError) {
+            throw authError;
+        }
+
+        if (!authUser) {
+            throw new Error(
+                "NO_AUTHENTICATED_USER",
+            );
+        }
+
+        if (authUser.id !== user.id) {
+            throw new Error(
+                "AUTH_USER_MISMATCH",
+            );
+        }
+
         const extension =
             avatar.name
                 .split(".")
                 .pop()
-                ?.toLowerCase() ||
-            "jpg";
+                ?.toLowerCase() || "";
+
+        const extensionMap: Record<
+            string,
+            string
+        > = {
+            jpg: "jpg",
+            jpeg: "jpg",
+            png: "png",
+            webp: "webp",
+        };
+
+        const normalizedExtension =
+            extensionMap[extension];
+
+        if (!normalizedExtension) {
+            throw new Error(
+                "UNSUPPORTED_IMAGE_TYPE",
+            );
+        }
 
         const filePath =
-            `${user.id}/avatar.${extension}`;
+            `${authUser.id}/avatar.${normalizedExtension}`;
 
         const {
             error: uploadError,
@@ -451,11 +457,12 @@ export default function CraftsmanProfileEditPage() {
             data: {
                 publicUrl,
             },
-        } = supabase.storage
-            .from("avatars")
-            .getPublicUrl(
-                filePath,
-            );
+        } =
+            supabase.storage
+                .from("avatars")
+                .getPublicUrl(
+                    filePath,
+                );
 
         return `${publicUrl}?v=${Date.now()}`;
     };
@@ -525,9 +532,7 @@ export default function CraftsmanProfileEditPage() {
                 await uploadAvatar();
 
             /*
-             * Update the main profile.
-             *
-             * avatar_url belongs to profiles.
+             * Update main profile.
              */
             const profileUpdate: {
                 full_name: string;
@@ -559,30 +564,16 @@ export default function CraftsmanProfileEditPage() {
             }
 
             /*
-             * Convert the comma-separated areas
-             * input into a PostgreSQL text[].
+             * Update craftsman profile.
              *
-             * Example:
-             * "مدينة نصر، مصر الجديدة، العباسية"
+             * Deliberately does NOT update:
+             * - areas
+             * - shop_address
+             * - verification_status
              *
-             * becomes:
-             * ["مدينة نصر", "مصر الجديدة", "العباسية"]
+             * Location is stored separately in
+             * profiles.location.
              */
-            const parsedAreas =
-                result.data.areas
-                    ? result.data.areas
-                          .split(
-                              /[,،]/,
-                          )
-                          .map(
-                              (area) =>
-                                  area.trim(),
-                          )
-                          .filter(
-                              Boolean,
-                          )
-                    : [];
-
             const parsedExperience =
                 result.data
                     .experienceYears
@@ -592,10 +583,6 @@ export default function CraftsmanProfileEditPage() {
                       )
                     : null;
 
-            /*
-             * Upsert because a craftsman account may
-             * not have a craftsman_profiles row yet.
-             */
             const {
                 error:
                     craftsmanProfileError,
@@ -618,13 +605,6 @@ export default function CraftsmanProfileEditPage() {
                             null,
                         experience_years:
                             parsedExperience,
-                        areas:
-                            parsedAreas,
-                        shop_address:
-                            result.data
-                                .shopAddress
-                                .trim() ||
-                            null,
                         is_available:
                             result.data
                                 .isAvailable,
@@ -641,10 +621,6 @@ export default function CraftsmanProfileEditPage() {
                 throw craftsmanProfileError;
             }
 
-            /*
-             * Do not update verification_status here.
-             * It is controlled by the verification system.
-             */
             await refreshUser();
 
             setAvatar(null);
@@ -658,15 +634,66 @@ export default function CraftsmanProfileEditPage() {
                     true,
                 );
             }
-        } catch (error) {
+        } catch (caughtError) {
             console.error(
                 "Failed to save craftsman profile:",
-                error,
+                caughtError,
             );
 
-            setError(
-                "حدث خطأ أثناء حفظ التعديلات. حاول مرة أخرى.",
-            );
+            const saveError =
+                caughtError as {
+                    message?: string;
+                    statusCode?: number;
+                };
+
+            if (
+                saveError.message ===
+                "NO_AUTHENTICATED_USER"
+            ) {
+                setError(
+                    "تعذر التحقق من حسابك. سجل دخولك مرة تانية وحاول.",
+                );
+            } else if (
+                saveError.message ===
+                "AUTH_USER_MISMATCH"
+            ) {
+                setError(
+                    "حصل تعارض في جلسة الحساب. أعد تحميل الصفحة وحاول مرة أخرى.",
+                );
+            } else if (
+                saveError.message?.includes(
+                    "row-level security",
+                )
+            ) {
+                setError(
+                    "تعذر رفع الصورة بسبب صلاحيات التخزين.",
+                );
+            } else if (
+                saveError.statusCode ===
+                    400 ||
+                saveError.message
+                    ?.toLowerCase()
+                    .includes("mime")
+            ) {
+                setError(
+                    "صيغة الصورة غير مسموحة.",
+                );
+            } else if (
+                saveError.message?.includes(
+                    "exceeded",
+                ) ||
+                saveError.message?.includes(
+                    "size",
+                )
+            ) {
+                setError(
+                    "حجم الصورة أكبر من الحد المسموح.",
+                );
+            } else {
+                setError(
+                    "حدث خطأ أثناء حفظ التعديلات. حاول مرة أخرى.",
+                );
+            }
         } finally {
             setIsSaving(false);
         }
@@ -674,10 +701,7 @@ export default function CraftsmanProfileEditPage() {
 
     if (isLoading) {
         return (
-            <div
-                 
-                className="mx-auto w-full max-w-3xl px-4 py-6"
-            >
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 <p className="text-sm text-muted-foreground">
                     جاري تحميل الملف...
                 </p>
@@ -691,10 +715,7 @@ export default function CraftsmanProfileEditPage() {
             "craftsman"
     ) {
         return (
-            <div
-                 
-                className="mx-auto w-full max-w-3xl px-4 py-6"
-            >
+            <div className="mx-auto w-full max-w-3xl px-4 py-6">
                 <Card>
                     <CardContent className="p-6">
                         <p className="text-sm text-muted-foreground">
@@ -707,11 +728,21 @@ export default function CraftsmanProfileEditPage() {
         );
     }
 
+    const verificationStatus =
+        craftsmanProfile
+            ?.verification_status;
+
+    const verificationLabel =
+        verificationStatus ===
+        "verified"
+            ? "الحساب موثق"
+            : verificationStatus ===
+                "rejected"
+            ? "تم رفض التوثيق"
+            : "التوثيق قيد المراجعة";
+
     return (
-        <div
-             
-            className="mx-auto w-full max-w-3xl px-4 py-6"
-        >
+        <div className="mx-auto w-full max-w-3xl px-4 py-6">
             {/* Header */}
             <div className="mb-6">
                 <Link
@@ -727,17 +758,14 @@ export default function CraftsmanProfileEditPage() {
                 </h1>
 
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    حدّث بياناتك عشان
-                    العملاء يقدروا يعرفوا
-                    عنك ويختاروك للشغلانات
-                    المناسبة.
+                    حدّث بياناتك عشان العملاء
+                    يقدروا يعرفوا عنك ويختاروك
+                    للشغلانات المناسبة.
                 </p>
             </div>
 
             <form
-                onSubmit={
-                    handleSubmit
-                }
+                onSubmit={handleSubmit}
                 className="space-y-6"
             >
                 {/* Avatar */}
@@ -791,8 +819,7 @@ export default function CraftsmanProfileEditPage() {
 
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     JPG أو PNG أو WEBP
-                                    بحد أقصى 5
-                                    ميجابايت.
+                                    بحد أقصى 5 ميجابايت.
                                 </p>
                             </div>
                         </div>
@@ -808,9 +835,8 @@ export default function CraftsmanProfileEditPage() {
                             </h2>
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                البيانات اللي
-                                بتظهر على
-                                حسابك.
+                                البيانات اللي بتظهر
+                                على حسابك.
                             </p>
                         </div>
 
@@ -832,31 +858,23 @@ export default function CraftsmanProfileEditPage() {
 
                                 <Input
                                     id="fullName"
-                                    value={
-                                        fullName
-                                    }
+                                    value={fullName}
                                     onFocus={() =>
                                         markTouched(
                                             "fullName",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "fullName",
                                         );
 
                                         setFullName(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="مثال: أحمد محمد"
-                                    maxLength={
-                                        100
-                                    }
+                                    maxLength={100}
                                     aria-invalid={
                                         touched.fullName &&
                                         Boolean(
@@ -867,8 +885,7 @@ export default function CraftsmanProfileEditPage() {
 
                                 {!touched.fullName && (
                                     <p className="text-xs text-muted-foreground">
-                                        الاسم اللي
-                                        هيظهر
+                                        الاسم اللي هيظهر
                                         للعملاء.
                                     </p>
                                 )}
@@ -913,31 +930,23 @@ export default function CraftsmanProfileEditPage() {
                                     id="phone"
                                     type="tel"
                                     dir="ltr"
-                                    value={
-                                        phone
-                                    }
+                                    value={phone}
                                     onFocus={() =>
                                         markTouched(
                                             "phone",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "phone",
                                         );
 
                                         setPhone(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="01xxxxxxxxx"
-                                    maxLength={
-                                        20
-                                    }
+                                    maxLength={20}
                                     aria-invalid={
                                         touched.phone &&
                                         Boolean(
@@ -948,20 +957,15 @@ export default function CraftsmanProfileEditPage() {
 
                                 {!touched.phone && (
                                     <p className="text-xs text-muted-foreground">
-                                        رقم الهاتف
-                                        لا يظهر
-                                        بشكل
-                                        عام
-                                        للعملاء.
+                                        رقم الهاتف لا يظهر
+                                        بشكل عام للعملاء.
                                     </p>
                                 )}
 
                                 {touched.phone &&
                                     phoneError && (
                                         <p className="text-xs text-destructive">
-                                            {
-                                                phoneError
-                                            }
+                                            {phoneError}
                                         </p>
                                     )}
 
@@ -1000,23 +1004,17 @@ export default function CraftsmanProfileEditPage() {
                                             "bio",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "bio",
                                         );
 
                                         setBio(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="اكتب نبذة بسيطة عن شغلك والخدمات اللي بتقدمها..."
-                                    maxLength={
-                                        1500
-                                    }
+                                    maxLength={1500}
                                     className="min-h-32 resize-none"
                                     aria-invalid={
                                         touched.bio &&
@@ -1030,12 +1028,9 @@ export default function CraftsmanProfileEditPage() {
                                     <div>
                                         {!touched.bio && (
                                             <p className="text-xs text-muted-foreground">
-                                                اشرح
-                                                للعملاء
-                                                خبرتك
-                                                ونوع
-                                                الشغل
-                                                اللي
+                                                اشرح للعملاء
+                                                خبرتك ونوع
+                                                الشغل اللي
                                                 بتعمله.
                                             </p>
                                         )}
@@ -1060,10 +1055,7 @@ export default function CraftsmanProfileEditPage() {
                                     </div>
 
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                        {
-                                            bio.length
-                                        }
-                                        /1500
+                                        {bio.length}/1500
                                     </span>
                                 </div>
                             </div>
@@ -1098,17 +1090,13 @@ export default function CraftsmanProfileEditPage() {
                                             "experienceYears",
                                         )
                                     }
-                                    onChange={(
-                                        event,
-                                    ) => {
+                                    onChange={(event) => {
                                         markTouched(
                                             "experienceYears",
                                         );
 
                                         setExperienceYears(
-                                            event
-                                                .target
-                                                .value,
+                                            event.target.value,
                                         );
                                     }}
                                     placeholder="مثال: 8"
@@ -1122,8 +1110,7 @@ export default function CraftsmanProfileEditPage() {
 
                                 {!touched.experienceYears && (
                                     <p className="text-xs text-muted-foreground">
-                                        عدد سنين
-                                        خبرتك في
+                                        عدد سنين خبرتك في
                                         المجال.
                                     </p>
                                 )}
@@ -1146,164 +1133,38 @@ export default function CraftsmanProfileEditPage() {
                                         </p>
                                     )}
                             </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            {/* Areas */}
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-
-                                    <label
-                                        htmlFor="areas"
-                                        className="text-sm font-medium"
-                                    >
-                                        المناطق اللي بتشتغل فيها
-                                    </label>
-
-                                    <span className="text-xs text-muted-foreground">
-                                        اختياري
-                                    </span>
-                                </div>
-
-                                <Input
-                                    id="areas"
-                                    value={
-                                        areas
-                                    }
-                                    onFocus={() =>
-                                        markTouched(
-                                            "areas",
-                                        )
-                                    }
-                                    onChange={(
-                                        event,
-                                    ) => {
-                                        markTouched(
-                                            "areas",
-                                        );
-
-                                        setAreas(
-                                            event
-                                                .target
-                                                .value,
-                                        );
-                                    }}
-                                    placeholder="مثال: مدينة نصر، مصر الجديدة، العباسية"
-                                    maxLength={
-                                        500
-                                    }
-                                    aria-invalid={
-                                        touched.areas &&
-                                        Boolean(
-                                            areasError,
-                                        )
-                                    }
-                                />
-
-                                {!touched.areas && (
-                                    <p className="text-xs text-muted-foreground">
-                                        افصل بين
-                                        المناطق
-                                        بفاصلة.
-                                    </p>
-                                )}
-
-                                {touched.areas &&
-                                    areasError && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                areasError
-                                            }
-                                        </p>
-                                    )}
-
-                                {touched.areas &&
-                                    !areasError &&
-                                    areas.trim() && (
-                                        <p className="flex items-center gap-1 text-xs text-green-600">
-                                            <Check className="h-3.5 w-3.5" />
-                                            المناطق تم تحديدها
-                                        </p>
-                                    )}
+                {/* Location */}
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
                             </div>
 
-                            {/* Shop address */}
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2">
-                                    <Store className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                                <h2 className="font-semibold">
+                                    موقعك
+                                </h2>
 
-                                    <label
-                                        htmlFor="shopAddress"
-                                        className="text-sm font-medium"
-                                    >
-                                        عنوان مكان العمل
-                                    </label>
+                                <p className="mt-1 text-sm leading-7 text-muted-foreground">
+                                    موقعك الدقيق محفوظ بشكل
+                                    خاص لمساعدتك في العثور
+                                    على الشغلانات القريبة
+                                    منك. إحداثيات موقعك لا
+                                    تظهر للعملاء أو
+                                    المستخدمين الآخرين.
+                                </p>
 
-                                    <span className="text-xs text-muted-foreground">
-                                        اختياري
-                                    </span>
-                                </div>
-
-                                <Input
-                                    id="shopAddress"
-                                    value={
-                                        shopAddress
-                                    }
-                                    onFocus={() =>
-                                        markTouched(
-                                            "shopAddress",
-                                        )
-                                    }
-                                    onChange={(
-                                        event,
-                                    ) => {
-                                        markTouched(
-                                            "shopAddress",
-                                        );
-
-                                        setShopAddress(
-                                            event
-                                                .target
-                                                .value,
-                                        );
-                                    }}
-                                    placeholder="مثال: شارع الطيران، مدينة نصر"
-                                    maxLength={
-                                        300
-                                    }
-                                    aria-invalid={
-                                        touched.shopAddress &&
-                                        Boolean(
-                                            shopAddressError,
-                                        )
-                                    }
-                                />
-
-                                {!touched.shopAddress && (
-                                    <p className="text-xs text-muted-foreground">
-                                        عنوان المحل
-                                        أو مكان
-                                        العمل إذا
-                                        كان عندك.
-                                    </p>
-                                )}
-
-                                {touched.shopAddress &&
-                                    shopAddressError && (
-                                        <p className="text-xs text-destructive">
-                                            {
-                                                shopAddressError
-                                            }
-                                        </p>
-                                    )}
-
-                                {touched.shopAddress &&
-                                    !shopAddressError &&
-                                    shopAddress.trim() && (
-                                        <p className="flex items-center gap-1 text-xs text-green-600">
-                                            <Check className="h-3.5 w-3.5" />
-                                            العنوان مناسب
-                                        </p>
-                                    )}
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    لو محتاج تغيّر موقعك،
+                                    يمكن تحديثه من خلال
+                                    ميزة تحديد الموقع
+                                    المخصصة.
+                                </p>
                             </div>
                         </div>
                     </CardContent>
@@ -1318,10 +1179,8 @@ export default function CraftsmanProfileEditPage() {
                             </h2>
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                بتحدد إذا كنت
-                                حاليًا متاح
-                                لاستقبال
-                                شغل جديد.
+                                بتحدد إذا كنت حاليًا
+                                متاح لاستقبال شغل جديد.
                             </p>
                         </div>
 
@@ -1393,33 +1252,20 @@ export default function CraftsmanProfileEditPage() {
                         </h2>
 
                         <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                            حالة توثيق الحساب
-                            لا يمكن تعديلها
-                            من هنا. لو لسه
-                            ما وثقتش حسابك
-                            تقدر تبدأ عملية
-                            التوثيق من صفحة
-                            التحقق من الهوية.
+                            حالة توثيق الحساب لا يمكن
+                            تعديلها من هنا.
                         </p>
 
                         <Separator className="my-5" />
 
-                        <div className="flex items-center justify-between gap-4 rounded-xl border p-4">
+                        <div className="flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <p className="font-medium">
                                     حالة الحساب
                                 </p>
 
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    {craftsmanProfile
-                                        ?.verification_status ===
-                                    "verified"
-                                        ? "الحساب موثق"
-                                        : craftsmanProfile
-                                              ?.verification_status ===
-                                          "rejected"
-                                        ? "تم رفض التوثيق"
-                                        : "التوثيق قيد المراجعة"}
+                                    {verificationLabel}
                                 </p>
                             </div>
 
@@ -1427,6 +1273,7 @@ export default function CraftsmanProfileEditPage() {
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    className="w-full sm:w-auto"
                                 >
                                     التحقق من الهوية
                                 </Button>
@@ -1467,9 +1314,7 @@ export default function CraftsmanProfileEditPage() {
 
                         <Button
                             type="submit"
-                            disabled={
-                                isSaving
-                            }
+                            disabled={isSaving}
                             className="w-full sm:w-auto"
                         >
                             {isSaving
@@ -1482,14 +1327,12 @@ export default function CraftsmanProfileEditPage() {
 
             {/* Back dialog */}
             <Dialog
-                open={
-                    showBackDialog
-                }
+                open={showBackDialog}
                 onOpenChange={
                     setShowBackDialog
                 }
             >
-                <DialogContent  >
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
                             عايز ترجع لصفحة{" "}
@@ -1497,10 +1340,9 @@ export default function CraftsmanProfileEditPage() {
                         </DialogTitle>
 
                         <DialogDescription>
-                            تم حفظ تعديلاتك
-                            بنجاح. تحب
-                            ترجع للصفحة
-                            اللي جيت منها؟
+                            تم حفظ تعديلاتك بنجاح.
+                            تحب ترجع للصفحة اللي
+                            جيت منها؟
                         </DialogDescription>
                     </DialogHeader>
 

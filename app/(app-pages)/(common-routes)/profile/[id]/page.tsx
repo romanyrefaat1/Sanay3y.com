@@ -43,6 +43,8 @@ type Review = {
     issue_type: string | null;
     comment: string | null;
     created_at: string;
+    reviewer_id: string;
+    job_id: string;
     reviewer: {
         id: string;
         full_name: string;
@@ -74,9 +76,18 @@ type PrivateCraftsmanProfile = {
 };
 
 type ClientProfile = {
-    area: string;
     gender: string | null;
     created_at: string;
+};
+
+type ClientRecentJob = {
+    id: string;
+    title: string;
+    service_type: string;
+    area: string;
+    status: string;
+    created_at: string;
+    selected_craftsman_id: string | null;
 };
 
 const roleLabels = {
@@ -154,6 +165,22 @@ function formatDate(date: string) {
     }).format(new Date(date));
 }
 
+function formatDistance(distanceKm: number | null) {
+    if (distanceKm === null || !Number.isFinite(distanceKm)) {
+        return "المسافة غير متاحة";
+    }
+
+    if (distanceKm < 1) {
+        return "أقل من 1 كم منك";
+    }
+
+    if (distanceKm < 10) {
+        return `${distanceKm.toFixed(1)} كم منك`;
+    }
+
+    return `${Math.round(distanceKm)} كم منك`;
+}
+
 function StarRating({
     rating,
     size = "h-4 w-4",
@@ -211,9 +238,8 @@ export default async function ProfilePage({
 
     /*
      * Authentication is optional.
-     *
      * Guests can view public profiles.
-     * Authenticated users additionally get owner-only fields/actions.
+     * Owners additionally get private fields.
      */
     const {
         data: { user },
@@ -224,6 +250,7 @@ export default async function ProfilePage({
      * BASE PROFILE
      * ============================================================
      */
+
     const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select(
@@ -243,11 +270,6 @@ export default async function ProfilePage({
         notFound();
     }
 
-    /*
-     * Only client/craftsman profiles are rendered by the public
-     * profile UI. We keep the existing role support instead of
-     * breaking admin/team accounts completely.
-     */
     const isCraftsman = profile.role === "craftsman";
     const isClient = profile.role === "client";
     const isActive = profile.is_active;
@@ -255,7 +277,44 @@ export default async function ProfilePage({
 
     /*
      * ============================================================
-     * ROLE-SPECIFIC DATA
+     * DISTANCE FROM CURRENT USER
+     * ============================================================
+     *
+     * The RPC calculates the distance server-side.
+     * No latitude/longitude is exposed to the browser.
+     *
+     * We don't calculate a distance for the user's own profile.
+     * Guests don't have a location to compare against.
+     */
+
+    let distanceKm: number | null = null;
+
+    if (user && !isOwnProfile) {
+        const { data, error } = await supabase.rpc(
+            "get_distance_from_user",
+            {
+                target_user_id: id,
+            },
+        );
+
+        if (error) {
+            console.error(
+                "Failed to calculate profile distance:",
+                error,
+            );
+        } else if (typeof data === "number") {
+            distanceKm = data;
+        }
+    }
+
+    const distanceLabel =
+        user && !isOwnProfile
+            ? formatDistance(distanceKm)
+            : null;
+
+    /*
+     * ============================================================
+     * ROLE-SPECIFIC PROFILE DATA
      * ============================================================
      */
 
@@ -264,15 +323,6 @@ export default async function ProfilePage({
     let client: ClientProfile | null = null;
 
     if (isCraftsman) {
-        /*
-         * Public craftsman fields only.
-         *
-         * Deliberately excludes:
-         * - phone
-         * - shop_address
-         * - temporary_area
-         * - temporary_location_until
-         */
         const { data, error } = await supabase
             .from("craftsman_profiles")
             .select(
@@ -309,9 +359,8 @@ export default async function ProfilePage({
         };
 
         /*
-         * Private fields are only fetched when viewing your own profile.
-         * This keeps the existing "مكان العمل" UI working for the owner
-         * without exposing exact/private location information publicly.
+         * Private craftsman fields.
+         * These are never fetched for other users.
          */
         if (isOwnProfile) {
             const { data: privateData, error: privateError } =
@@ -341,14 +390,16 @@ export default async function ProfilePage({
 
     if (isClient) {
         /*
-         * Client profile fields that are safe for the public profile.
-         * Phone is intentionally not selected.
+         * IMPORTANT:
+         * area was removed from client_profiles.
+         *
+         * The client's exact location now lives privately in
+         * profiles.location and is deliberately NOT selected here.
          */
         const { data, error } = await supabase
             .from("client_profiles")
             .select(
                 `
-                area,
                 gender,
                 created_at
                 `,
@@ -361,7 +412,6 @@ export default async function ProfilePage({
         }
 
         client = {
-            area: data.area,
             gender: data.gender,
             created_at: data.created_at,
         };
@@ -386,29 +436,17 @@ export default async function ProfilePage({
     let clientCompletedJobs = 0;
     let clientActiveJobs = 0;
 
-    let clientRecentJobs: {
-        id: string;
-        title: string;
-        service_type: string;
-        area: string;
-        status: string;
-        created_at: string;
-        selected_craftsman_id: string | null;
-    }[] = [];
+    let clientRecentJobs: ClientRecentJob[] = [];
 
     let clientReviews: Review[] = [];
 
     /*
      * ============================================================
-     * CRAFTSMAN DATA
+     * CRAFTSMAN STATS + REVIEWS
      * ============================================================
      */
 
     if (isCraftsman) {
-        /*
-         * Only completed jobs where this craftsman was selected
-         * count toward the rating threshold.
-         */
         const {
             count: completedJobsCount,
             error: completedJobsError,
@@ -430,9 +468,6 @@ export default async function ProfilePage({
             completedJobs = completedJobsCount ?? 0;
         }
 
-        /*
-         * Reviews received by this craftsman.
-         */
         const { data: reviewRows, error: reviewsError } = await supabase
             .from("reviews")
             .select(
@@ -450,7 +485,9 @@ export default async function ProfilePage({
             )
             .eq("reviewee_id", id)
             .eq("reviewee_role", "craftsman")
-            .order("created_at", { ascending: false });
+            .order("created_at", {
+                ascending: false,
+            });
 
         if (reviewsError) {
             console.error(
@@ -473,9 +510,7 @@ export default async function ProfilePage({
                     reviewerIds.length
                         ? supabase
                               .from("profiles")
-                              .select(
-                                  "id, full_name, avatar_url",
-                              )
+                              .select("id, full_name, avatar_url")
                               .in("id", reviewerIds)
                         : Promise.resolve({ data: [] }),
 
@@ -506,6 +541,8 @@ export default async function ProfilePage({
                 issue_type: review.issue_type,
                 comment: review.comment,
                 created_at: review.created_at,
+                reviewer_id: review.reviewer_id,
+                job_id: review.job_id,
                 reviewer:
                     reviewerMap.get(review.reviewer_id) ?? null,
                 job: jobMap.get(review.job_id) ?? null,
@@ -515,7 +552,7 @@ export default async function ProfilePage({
 
     /*
      * ============================================================
-     * CLIENT DATA
+     * CLIENT STATS + REVIEWS
      * ============================================================
      */
 
@@ -624,9 +661,7 @@ export default async function ProfilePage({
                     reviewerIds.length
                         ? supabase
                               .from("profiles")
-                              .select(
-                                  "id, full_name, avatar_url",
-                              )
+                              .select("id, full_name, avatar_url")
                               .in("id", reviewerIds)
                         : Promise.resolve({ data: [] }),
 
@@ -657,6 +692,8 @@ export default async function ProfilePage({
                 issue_type: review.issue_type,
                 comment: review.comment,
                 created_at: review.created_at,
+                reviewer_id: review.reviewer_id,
+                job_id: review.job_id,
                 reviewer:
                     reviewerMap.get(review.reviewer_id) ?? null,
                 job: jobMap.get(review.job_id) ?? null,
@@ -704,9 +741,6 @@ export default async function ProfilePage({
               ) / respectRatings.length
             : null;
 
-    /*
-     * Craftsman overall rating is hidden until 5 completed jobs.
-     */
     const canShowOverallRating =
         isCraftsman &&
         completedJobs >= RATING_JOB_THRESHOLD;
@@ -743,6 +777,7 @@ export default async function ProfilePage({
                 {/* ======================================================
                     PROFILE HEADER
                 ======================================================= */}
+
                 <Card className="overflow-hidden">
                     <CardContent className="p-6 md:p-8">
                         <div className="flex flex-col gap-6 md:flex-row md:items-start">
@@ -833,7 +868,7 @@ export default async function ProfilePage({
                                     )}
 
                                     {isClient &&
-                                        client?.area && (
+                                        distanceLabel && (
                                             <>
                                                 <span className="hidden text-border sm:inline">
                                                     |
@@ -841,8 +876,9 @@ export default async function ProfilePage({
 
                                                 <div className="flex items-center gap-1.5">
                                                     <MapPin className="h-4 w-4" />
+
                                                     <span>
-                                                        {client.area}
+                                                        {distanceLabel}
                                                     </span>
                                                 </div>
                                             </>
@@ -894,7 +930,6 @@ export default async function ProfilePage({
 
                         {isCraftsman && craftsman && (
                             <>
-                                {/* Overview */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>
@@ -991,7 +1026,6 @@ export default async function ProfilePage({
                                     </CardContent>
                                 </Card>
 
-                                {/* About */}
                                 {craftsman.bio && (
                                     <Card>
                                         <CardHeader>
@@ -1008,7 +1042,6 @@ export default async function ProfilePage({
                                     </Card>
                                 )}
 
-                                {/* Experience */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>
@@ -1037,7 +1070,6 @@ export default async function ProfilePage({
                                     </CardContent>
                                 </Card>
 
-                                {/* Areas */}
                                 {craftsman.areas?.length ? (
                                     <Card>
                                         <CardHeader>
@@ -1065,7 +1097,6 @@ export default async function ProfilePage({
                                     </Card>
                                 ) : null}
 
-                                {/* Private location / owner-only */}
                                 {isOwnProfile &&
                                     craftsmanPrivate?.shop_address && (
                                         <Card>
@@ -1121,7 +1152,6 @@ export default async function ProfilePage({
                                         </Card>
                                     )}
 
-                                {/* Reviews */}
                                 <Card>
                                     <CardHeader>
                                         <div className="flex items-center justify-between gap-4">
@@ -1168,138 +1198,11 @@ export default async function ProfilePage({
                                             <div className="divide-y">
                                                 {craftsmanReviews.map(
                                                     (review) => (
-                                                        <div
+                                                        <ReviewItem
                                                             key={review.id}
-                                                            className="py-6 first:pt-0 last:pb-0"
-                                                        >
-                                                            <div className="flex items-start gap-3">
-                                                                <Avatar className="h-10 w-10 shrink-0">
-                                                                    <AvatarImage
-                                                                        src={
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.avatar_url ??
-                                                                            undefined
-                                                                        }
-                                                                        alt={
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.full_name ??
-                                                                            "العميل"
-                                                                        }
-                                                                    />
-
-                                                                    <AvatarFallback>
-                                                                        {getInitials(
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.full_name ??
-                                                                                "عميل",
-                                                                        )}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
-
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                                        <div>
-                                                                            <p className="font-semibold">
-                                                                                {
-                                                                                    review
-                                                                                        .reviewer
-                                                                                        ?.full_name ??
-                                                                                    "عميل"
-                                                                                }
-                                                                            </p>
-
-                                                                            {review.job && (
-                                                                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                                                                    {
-                                                                                        review
-                                                                                            .job
-                                                                                            .title
-                                                                                    }
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            {formatReviewDate(
-                                                                                review.created_at,
-                                                                            )}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                                                        <div className="rounded-lg bg-muted/40 p-3">
-                                                                            <p className="mb-2 text-sm font-medium">
-                                                                                جودة الشغل
-                                                                            </p>
-
-                                                                            <div className="flex items-center gap-2">
-                                                                                <StarRating
-                                                                                    rating={
-                                                                                        review.work_rating
-                                                                                    }
-                                                                                />
-
-                                                                                {review.work_rating !==
-                                                                                    null && (
-                                                                                    <span className="text-sm font-medium">
-                                                                                        {
-                                                                                            review.work_rating
-                                                                                        }
-                                                                                        /5
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="rounded-lg bg-muted/40 p-3">
-                                                                            <p className="mb-2 text-sm font-medium">
-                                                                                الاحترام والتعامل
-                                                                            </p>
-
-                                                                            <div className="flex items-center gap-2">
-                                                                                <StarRating
-                                                                                    rating={
-                                                                                        review.respect_rating
-                                                                                    }
-                                                                                />
-
-                                                                                {review.respect_rating !==
-                                                                                    null && (
-                                                                                    <span className="text-sm font-medium">
-                                                                                        {
-                                                                                            review.respect_rating
-                                                                                        }
-                                                                                        /5
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {review.comment && (
-                                                                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">
-                                                                            {
-                                                                                review.comment
-                                                                            }
-                                                                        </p>
-                                                                    )}
-
-                                                                    {review.issue_type && (
-                                                                        <Badge
-                                                                            variant="secondary"
-                                                                            className="mt-3 font-normal"
-                                                                        >
-                                                                            {getIssueTypeLabel(
-                                                                                review.issue_type,
-                                                                            )}
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                            review={review}
+                                                            fallbackName="العميل"
+                                                        />
                                                     ),
                                                 )}
                                             </div>
@@ -1315,7 +1218,6 @@ export default async function ProfilePage({
 
                         {isClient && client && (
                             <>
-                                {/* Client Overview */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
@@ -1326,68 +1228,41 @@ export default async function ProfilePage({
 
                                     <CardContent>
                                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
-                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                            <StatBox
+                                                icon={
                                                     <BriefcaseBusiness className="h-4 w-4" />
+                                                }
+                                                label="الطلبات المنشورة"
+                                                value={clientTotalJobs}
+                                            />
 
-                                                    <span className="text-sm">
-                                                        الطلبات المنشورة
-                                                    </span>
-                                                </div>
-
-                                                <p className="text-2xl font-bold">
-                                                    {clientTotalJobs}
-                                                </p>
-                                            </div>
-
-                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
-                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                            <StatBox
+                                                icon={
                                                     <CheckCircle2 className="h-4 w-4" />
+                                                }
+                                                label="أعمال مكتملة"
+                                                value={clientCompletedJobs}
+                                            />
 
-                                                    <span className="text-sm">
-                                                        أعمال مكتملة
-                                                    </span>
-                                                </div>
-
-                                                <p className="text-2xl font-bold">
-                                                    {clientCompletedJobs}
-                                                </p>
-                                            </div>
-
-                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
-                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                                            <StatBox
+                                                icon={
                                                     <Clock3 className="h-4 w-4" />
+                                                }
+                                                label="طلبات نشطة"
+                                                value={clientActiveJobs}
+                                            />
 
-                                                    <span className="text-sm">
-                                                        طلبات نشطة
-                                                    </span>
-                                                </div>
-
-                                                <p className="text-2xl font-bold">
-                                                    {clientActiveJobs}
-                                                </p>
-                                            </div>
-
-                                            <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
-                                                <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-                                                    <MessageSquareIcon />
-
-                                                    <span className="text-sm">
-                                                        التقييمات
-                                                    </span>
-                                                </div>
-
-                                                <p className="text-2xl font-bold">
-                                                    {
-                                                        clientReviews.length
-                                                    }
-                                                </p>
-                                            </div>
+                                            <StatBox
+                                                icon={<MessageSquareIcon />}
+                                                label="التقييمات"
+                                                value={
+                                                    clientReviews.length
+                                                }
+                                            />
                                         </div>
                                     </CardContent>
                                 </Card>
 
-                                {/* Client Information */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>
@@ -1400,12 +1275,14 @@ export default async function ProfilePage({
                                             <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
                                                 <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
                                                     <MapPin className="h-4 w-4" />
-                                                    المنطقة
+                                                    المسافة
                                                 </div>
 
                                                 <p className="font-medium">
-                                                    {client.area ||
-                                                        "غير محددة"}
+                                                    {isOwnProfile
+                                                        ? "أنت"
+                                                        : distanceLabel ??
+                                                          "المسافة غير متاحة"}
                                                 </p>
                                             </div>
 
@@ -1442,7 +1319,6 @@ export default async function ProfilePage({
                                     </CardContent>
                                 </Card>
 
-                                {/* Client Activity */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2">
@@ -1531,7 +1407,6 @@ export default async function ProfilePage({
                                     </CardContent>
                                 </Card>
 
-                                {/* Client Reviews */}
                                 <Card>
                                     <CardHeader>
                                         <div className="flex items-center justify-between gap-4">
@@ -1570,139 +1445,12 @@ export default async function ProfilePage({
                                             <div className="divide-y">
                                                 {clientReviews.map(
                                                     (review) => (
-                                                        <div
+                                                        <ReviewItem
                                                             key={review.id}
-                                                            className="py-6 first:pt-0 last:pb-0"
-                                                        >
-                                                            <div className="flex items-start gap-3">
-                                                                <Avatar className="h-10 w-10 shrink-0">
-                                                                    <AvatarImage
-                                                                        src={
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.avatar_url ??
-                                                                            undefined
-                                                                        }
-                                                                        alt={
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.full_name ??
-                                                                            "صنايعي"
-                                                                        }
-                                                                    />
-
-                                                                    <AvatarFallback>
-                                                                        {getInitials(
-                                                                            review
-                                                                                .reviewer
-                                                                                ?.full_name ??
-                                                                                "صنايعي",
-                                                                        )}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
-
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                                                        <div>
-                                                                            <p className="font-semibold">
-                                                                                {
-                                                                                    review
-                                                                                        .reviewer
-                                                                                        ?.full_name ??
-                                                                                    "صنايعي"
-                                                                                }
-                                                                            </p>
-
-                                                                            {review.job && (
-                                                                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                                                                    عن شغلانة:{" "}
-                                                                                    {
-                                                                                        review
-                                                                                            .job
-                                                                                            .title
-                                                                                    }
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            {formatReviewDate(
-                                                                                review.created_at,
-                                                                            )}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                                                        <div className="rounded-lg bg-muted/40 p-3">
-                                                                            <p className="mb-2 text-sm font-medium">
-                                                                                جودة التعامل في الشغل
-                                                                            </p>
-
-                                                                            <div className="flex items-center gap-2">
-                                                                                <StarRating
-                                                                                    rating={
-                                                                                        review.work_rating
-                                                                                    }
-                                                                                />
-
-                                                                                {review.work_rating !==
-                                                                                    null && (
-                                                                                    <span className="text-sm font-medium">
-                                                                                        {
-                                                                                            review.work_rating
-                                                                                        }
-                                                                                        /5
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="rounded-lg bg-muted/40 p-3">
-                                                                            <p className="mb-2 text-sm font-medium">
-                                                                                الاحترام والتعامل
-                                                                            </p>
-
-                                                                            <div className="flex items-center gap-2">
-                                                                                <StarRating
-                                                                                    rating={
-                                                                                        review.respect_rating
-                                                                                    }
-                                                                                />
-
-                                                                                {review.respect_rating !==
-                                                                                    null && (
-                                                                                    <span className="text-sm font-medium">
-                                                                                        {
-                                                                                            review.respect_rating
-                                                                                        }
-                                                                                        /5
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {review.comment && (
-                                                                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">
-                                                                            {
-                                                                                review.comment
-                                                                            }
-                                                                        </p>
-                                                                    )}
-
-                                                                    {review.issue_type && (
-                                                                        <Badge
-                                                                            variant="secondary"
-                                                                            className="mt-3 font-normal"
-                                                                        >
-                                                                            {getIssueTypeLabel(
-                                                                                review.issue_type,
-                                                                            )}
-                                                                        </Badge>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                            review={review}
+                                                            fallbackName="صنايعي"
+                                                            showJobPrefix
+                                                        />
                                                     ),
                                                 )}
                                             </div>
@@ -1718,7 +1466,6 @@ export default async function ProfilePage({
                     ======================================================= */}
 
                     <aside className="space-y-6">
-                        {/* Craftsman sidebar */}
                         {isCraftsman && craftsman && (
                             <Card>
                                 <CardHeader>
@@ -1731,7 +1478,6 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <UserRound className="h-5 w-5 text-muted-foreground" />
-
                                             <span>
                                                 حالة الحساب
                                             </span>
@@ -1755,7 +1501,6 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <ShieldCheck className="h-5 w-5 text-muted-foreground" />
-
                                             <span>
                                                 التحقق من الهوية
                                             </span>
@@ -1783,7 +1528,6 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <BriefcaseBusiness className="h-5 w-5 text-muted-foreground" />
-
                                             <span>
                                                 حالة العمل
                                             </span>
@@ -1807,7 +1551,6 @@ export default async function ProfilePage({
                                     <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-2">
                                             <Clock3 className="h-5 w-5 text-muted-foreground" />
-
                                             <span>
                                                 سرعة الرد
                                             </span>
@@ -1823,7 +1566,6 @@ export default async function ProfilePage({
                             </Card>
                         )}
 
-                        {/* Client sidebar */}
                         {isClient && client && (
                             <>
                                 <Card>
@@ -1837,7 +1579,6 @@ export default async function ProfilePage({
                                         <div className="flex items-center justify-between gap-4">
                                             <div className="flex items-center gap-2">
                                                 <UserRound className="h-5 w-5 text-muted-foreground" />
-
                                                 <span>
                                                     حالة الحساب
                                                 </span>
@@ -1863,13 +1604,15 @@ export default async function ProfilePage({
                                                 <MapPin className="h-5 w-5 text-muted-foreground" />
 
                                                 <span>
-                                                    المنطقة
+                                                    المسافة
                                                 </span>
                                             </div>
 
                                             <span className="text-sm font-medium">
-                                                {client.area ||
-                                                    "غير محددة"}
+                                                {isOwnProfile
+                                                    ? "أنت"
+                                                    : distanceLabel ??
+                                                      "غير متاحة"}
                                             </span>
                                         </div>
 
@@ -1973,6 +1716,155 @@ export default async function ProfilePage({
                 </div>
             </div>
         </main>
+    );
+}
+
+/*
+ * ============================================================
+ * SMALL UI COMPONENTS
+ * ============================================================
+ */
+
+function StatBox({
+    icon,
+    label,
+    value,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    value: number;
+}) {
+    return (
+        <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+            <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+                {icon}
+
+                <span className="text-sm">
+                    {label}
+                </span>
+            </div>
+
+            <p className="text-2xl font-bold">
+                {value}
+            </p>
+        </div>
+    );
+}
+
+function ReviewItem({
+    review,
+    fallbackName,
+    showJobPrefix = false,
+}: {
+    review: Review;
+    fallbackName: string;
+    showJobPrefix?: boolean;
+}) {
+    return (
+        <div className="py-6 first:pt-0 last:pb-0">
+            <div className="flex items-start gap-3">
+                <Avatar className="h-10 w-10 shrink-0">
+                    <AvatarImage
+                        src={
+                            review.reviewer?.avatar_url ??
+                            undefined
+                        }
+                        alt={
+                            review.reviewer?.full_name ??
+                            fallbackName
+                        }
+                    />
+
+                    <AvatarFallback>
+                        {getInitials(
+                            review.reviewer?.full_name ??
+                                fallbackName,
+                        )}
+                    </AvatarFallback>
+                </Avatar>
+
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-semibold">
+                                {review.reviewer?.full_name ??
+                                    fallbackName}
+                            </p>
+
+                            {review.job && (
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {showJobPrefix
+                                        ? "عن شغلانة: "
+                                        : ""}
+                                    {review.job.title}
+                                </p>
+                            )}
+                        </div>
+
+                        <span className="text-xs text-muted-foreground">
+                            {formatReviewDate(
+                                review.created_at,
+                            )}
+                        </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="mb-2 text-sm font-medium">
+                                جودة الشغل
+                            </p>
+
+                            <div className="flex items-center gap-2">
+                                <StarRating
+                                    rating={review.work_rating}
+                                />
+
+                                {review.work_rating !== null && (
+                                    <span className="text-sm font-medium">
+                                        {review.work_rating}/5
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg bg-muted/40 p-3">
+                            <p className="mb-2 text-sm font-medium">
+                                الاحترام والتعامل
+                            </p>
+
+                            <div className="flex items-center gap-2">
+                                <StarRating
+                                    rating={review.respect_rating}
+                                />
+
+                                {review.respect_rating !== null && (
+                                    <span className="text-sm font-medium">
+                                        {review.respect_rating}/5
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {review.comment && (
+                        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                            {review.comment}
+                        </p>
+                    )}
+
+                    {review.issue_type && (
+                        <Badge
+                            variant="secondary"
+                            className="mt-3 font-normal"
+                        >
+                            {getIssueTypeLabel(
+                                review.issue_type,
+                            )}
+                        </Badge>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
 
