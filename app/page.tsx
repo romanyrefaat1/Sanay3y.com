@@ -143,9 +143,9 @@ export default function HomePage() {
             للسباكة والكهرباء
           </h1>
 
-          <p className="mt-6 max-w-2xl font-cairo text-3xl font-bold leading-tight sm:text-4xl">
+          <h2 className="mt-6 max-w-2xl font-cairo text-3xl font-bold leading-tight sm:text-4xl">
             مش عارف تجيب مين؟
-          </p>
+          </h2>
 
           <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
             عندك مشكلة في البيت ومش عارف تبدأ منين؟ اكتب اللي حاصل زي ما هو، من غير ما تعرف اسم العطل أو المصطلح الصح، والصنايعية المناسبين يقدروا يشوفوا طلبك ويتقدموا لك.
