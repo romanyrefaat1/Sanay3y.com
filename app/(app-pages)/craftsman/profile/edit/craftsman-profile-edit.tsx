@@ -44,6 +44,7 @@ import {
 
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/contexts/user-context";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 const craftsmanProfileSchema = z.object({
     fullName: z
@@ -763,6 +764,8 @@ export default function CraftsmanProfileEditPage() {
                     للشغلانات المناسبة.
                 </p>
             </div>
+
+            <TelegramConnectAlert />
 
             <form
                 onSubmit={handleSubmit}

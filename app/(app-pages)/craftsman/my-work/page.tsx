@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 import { createClient } from "@/lib/supabase/server";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type JobApplication = {
     id: string;
@@ -417,6 +418,8 @@ export default async function CraftsmanMyWorkPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                <TelegramConnectAlert />
 
                 {/* Empty state */}
                 {craftsmanApplications.length === 0 ? (

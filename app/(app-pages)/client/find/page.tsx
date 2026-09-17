@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import FindFilters from "./(components)/find-filters";
 import CraftsmanList from "./(components)/craftsman-list";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type SearchParams = {
     q?: string;
@@ -483,6 +484,8 @@ export default async function ClientFindPage({
                     لاقي الصنايعي المناسب لشغلك القريب منك
                 </p>
             </div>
+
+            <TelegramConnectAlert />
 
             <Suspense
                 key={JSON.stringify(params)}

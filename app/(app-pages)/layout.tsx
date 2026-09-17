@@ -36,7 +36,7 @@ export default async function AppRoutesLayout({
           <CraftsmanNavbar />
         ) : role === "client" ? (
           <ClientNavbar />
-        ) : (
+        ) : role !== "admin" && (
           <GuestNavbar />
         )}
       </div>

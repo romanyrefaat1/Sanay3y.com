@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/contexts/user-context";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type DashboardStats = {
     totalJobs: number;
@@ -213,6 +214,8 @@ export default function ClientDashboardIndex() {
                     </Button>
                 </Link>
             </div>
+
+            <TelegramConnectAlert />
 
             <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                 {/* Sidebar */}

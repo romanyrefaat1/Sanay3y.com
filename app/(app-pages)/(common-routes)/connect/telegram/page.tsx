@@ -32,125 +32,146 @@ export default function TelegramConnectionPage() {
     const supabase = createClient();
 
     useEffect(() => {
-        let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-        async function initialize() {
-            try {
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser();
+    async function initialize() {
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
 
-                if (!user) {
-                    window.location.href = "/client/auth/sign-up";
-                    return;
-                }
+            if (cancelled) return;
 
-                const { data: profile, error: profileError } =
-                    await supabase
-                        .from("profiles")
-                        .select("role")
-                        .eq("id", user.id)
-                        .single();
+            if (!user) {
+                window.location.href = "/client/auth/sign-up";
+                return;
+            }
 
-                if (profileError || !profile) {
-                    throw new Error("تعذر تحديد نوع الحساب");
-                }
+            const { data: profile, error: profileError } =
+                await supabase
+                    .from("profiles")
+                    .select("role")
+                    .eq("id", user.id)
+                    .single();
 
-                if (
-                    profile.role !== "client" &&
-                    profile.role !== "craftsman"
-                ) {
-                    throw new Error("نوع الحساب غير مدعوم");
-                }
+            if (cancelled) return;
 
-                const currentBotType = profile.role as BotType;
+            if (profileError || !profile) {
+                throw new Error("تعذر تحديد نوع الحساب");
+            }
 
-                setBotType(currentBotType);
+            if (
+                profile.role !== "client" &&
+                profile.role !== "craftsman"
+            ) {
+                throw new Error("نوع الحساب غير مدعوم");
+            }
 
-                // Check immediately in case the account is already connected.
-                const { data: connection, error: connectionError } =
-                    await supabase
-                        .from("telegram_connections")
-                        .select("id, is_active")
-                        .eq("user_id", user.id)
-                        .eq("bot_type", currentBotType)
-                        .eq("is_active", true)
-                        .maybeSingle();
+            const currentBotType = profile.role as BotType;
 
-                if (connectionError) {
-                    throw connectionError;
-                }
+            setBotType(currentBotType);
 
-                if (connection) {
-                    setConnected(true);
-                    setLoading(false);
-                    return;
-                }
+            const { data: connection, error: connectionError } =
+                await supabase
+                    .from("telegram_connections")
+                    .select("id, is_active")
+                    .eq("user_id", user.id)
+                    .eq("bot_type", currentBotType)
+                    .eq("is_active", true)
+                    .maybeSingle();
 
-                /*
-                 * Listen for the webhook creating/updating the connection.
-                 *
-                 * This is the important table to listen to.
-                 * telegram_link_tokens is temporary and gets deleted
-                 * by the webhook after a successful connection.
-                 */
-                channel = supabase
-                    .channel(`telegram-connection-${user.id}`)
-                    .on(
-                        "postgres_changes",
-                        {
-                            event: "*",
-                            schema: "public",
-                            table: "telegram_connections",
-                            filter: `user_id=eq.${user.id}`,
-                        },
-                        (payload) => {
-                            const record =
-                                payload.new as {
-                                    user_id?: string;
-                                    bot_type?: BotType;
-                                    is_active?: boolean;
-                                };
+            if (cancelled) return;
 
-                            if (
-                                record.user_id === user.id &&
-                                record.bot_type === currentBotType &&
-                                record.is_active === true
-                            ) {
-                                setConnected(true);
-                                setConnecting(false);
-                            }
-                        }
-                    )
-                    .subscribe((status) => {
-                        console.log(
-                            "Telegram realtime status:",
-                            status
-                        );
-                    });
+            if (connectionError) {
+                throw connectionError;
+            }
 
+            if (connection) {
+                setConnected(true);
                 setLoading(false);
-            } catch (err) {
-                console.error(err);
+                return;
+            }
 
-                setError(
-                    err instanceof Error
-                        ? err.message
-                        : "حدث خطأ غير متوقع"
+            /*
+             * The connection does not exist yet.
+             * Listen for the Telegram webhook creating it.
+             */
+            const newChannel = supabase.channel(
+                `telegram-connection-${user.id}`
+            );
+
+            channel = newChannel;
+
+            newChannel.on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "telegram_connections",
+                    filter: `user_id=eq.${user.id}`,
+                },
+                (payload) => {
+                    if (cancelled) return;
+
+                    const record = payload.new as {
+                        user_id?: string;
+                        bot_type?: BotType;
+                        is_active?: boolean;
+                    };
+
+                    if (
+                        record.user_id === user.id &&
+                        record.bot_type === currentBotType &&
+                        record.is_active === true
+                    ) {
+                        setConnected(true);
+                        setConnecting(false);
+                    }
+                }
+            );
+
+            if (cancelled) {
+                await supabase.removeChannel(newChannel);
+                return;
+            }
+
+            newChannel.subscribe((status) => {
+                if (cancelled) return;
+
+                console.log(
+                    "Telegram realtime status:",
+                    status
                 );
+            });
 
-                setLoading(false);
-            }
+            setLoading(false);
+        } catch (err) {
+            if (cancelled) return;
+
+            console.error(err);
+
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "حدث خطأ غير متوقع"
+            );
+
+            setLoading(false);
         }
+    }
 
-        initialize();
+    initialize();
 
-        return () => {
-            if (channel) {
-                supabase.removeChannel(channel);
-            }
-        };
-    }, []);
+    return () => {
+        cancelled = true;
+
+        if (channel) {
+            supabase.removeChannel(channel);
+            channel = null;
+        }
+    };
+}, [supabase]);
 
     const handleConnect = async () => {
         if (!botType) {
@@ -212,160 +233,161 @@ export default function TelegramConnectionPage() {
     };
 
     if (loading) {
-        return (
-            <main className="min-h-screen flex items-center justify-center px-4">
-                <Loader2 className="h-6 w-6 animate-spin" />
-            </main>
-        );
-    }
-
-    if (error) {
-        return (
-            <main className="min-h-screen flex items-center justify-center px-4">
-                <Card className="w-full max-w-md">
-                    <CardContent className="p-6 text-center">
-                        <p className="text-sm text-destructive">
-                            {error}
-                        </p>
-                    </CardContent>
-                </Card>
-            </main>
-        );
-    }
-
-    if (connected) {
-        return (
-            <main className="min-h-screen flex items-center justify-center px-4">
-                <Card className="w-full max-w-md">
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10">
-                            <CheckCircle2 className="h-7 w-7 text-green-500" />
-                        </div>
-
-                        <CardTitle>
-                            تم ربط تيليجرام بنجاح
-                        </CardTitle>
-                    </CardHeader>
-
-                    <CardContent className="space-y-5 text-center">
-                        <p className="text-sm text-muted-foreground">
-                            حسابك متصل بتيليجرام. هنبعتلك
-                            الإشعارات المهمة على البوت.
-                        </p>
-
-                        <Button asChild className="w-full">
-                            <Link href="/dashboard">
-                                العودة للوحة التحكم
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-            </main>
-        );
-    }
-
     return (
-        <main className="min-h-screen flex items-center justify-center px-4 py-10">
-            <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10">
-                        <Send className="h-7 w-7 text-blue-500" />
-                    </div>
-
-                    <CardTitle className="text-xl">
-                        اربط حسابك بتيليجرام
-                    </CardTitle>
-
-                    <p className="text-sm text-muted-foreground">
-                        خليك متابع إشعارات صنايعي.كوم من
-                        تيليجرام بسهولة.
-                    </p>
-                </CardHeader>
-
-                <CardContent className="space-y-6">
-                    <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                            <ShieldCheck className="mt-0.5 h-5 w-5 text-blue-500" />
-
-                            <div>
-                                <p className="text-sm font-medium">
-                                    1. افتح البوت
-                                </p>
-
-                                <p className="text-xs text-muted-foreground">
-                                    اضغط على الزر علشان تفتح
-                                    البوت الخاص بحسابك.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <Send className="mt-0.5 h-5 w-5 text-blue-500" />
-
-                            <div>
-                                <p className="text-sm font-medium">
-                                    2. اضغط Start
-                                </p>
-
-                                <p className="text-xs text-muted-foreground">
-                                    تيليجرام هيكمل عملية الربط
-                                    تلقائيًا.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                            <CheckCircle2 className="mt-0.5 h-5 w-5 text-blue-500" />
-
-                            <div>
-                                <p className="text-sm font-medium">
-                                    3. تم الربط
-                                </p>
-
-                                <p className="text-xs text-muted-foreground">
-                                    الصفحة هتتحدث تلقائيًا بعد
-                                    نجاح الربط.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {telegramUrl && (
-                        <div className="rounded-lg border border-border bg-muted/30 p-3">
-                            <p className="text-center text-xs text-muted-foreground">
-                                لو تيليجرام ما فتحش تلقائيًا،
-                                اضغط الزر مرة تانية.
-                            </p>
-                        </div>
-                    )}
-
-                    <Button
-                        onClick={handleConnect}
-                        disabled={connecting}
-                        className="w-full"
-                        size="lg"
-                    >
-                        {connecting ? (
-                            <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                جاري فتح تيليجرام...
-                            </>
-                        ) : (
-                            <>
-                                <ExternalLink className="h-4 w-4" />
-                                {telegramUrl
-                                    ? "فتح تيليجرام"
-                                    : "ربط تيليجرام"}
-                            </>
-                        )}
-                    </Button>
-
-                    <p className="text-center text-xs text-muted-foreground">
-                        مش هنطلب منك كلمة سر تيليجرام أو أي
-                        بيانات حساسة.
-                    </p>
-                </CardContent>
-            </Card>
+        <main className="flex min-h-screen flex-col items-center justify-center gap-3 px-4">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+                بنجهز رابط تيليجرام...
+            </p>
         </main>
     );
+}
+
+if (error) {
+    return (
+        <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+            <div className="w-full max-w-sm text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+                    <X className="h-6 w-6 text-destructive" />
+                </div>
+
+                <p className="text-sm font-medium text-foreground">
+                    حصلت مشكلة في ربط تيليجرام
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {error}
+                </p>
+
+                <div className="mt-6 flex flex-col gap-2">
+                    <Button onClick={() => window.location.reload()}>
+                        حاول مرة أخرى
+                    </Button>
+
+                    <Button variant="ghost" asChild>
+                        <Link href="/dashboard">العودة للوحة التحكم</Link>
+                    </Button>
+                </div>
+            </div>
+        </main>
+    );
+}
+
+if (connected) {
+    return (
+        <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+            <div className="w-full max-w-sm text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success/10 animate-success-pop">
+                    <CheckCircle2 className="h-7 w-7 text-success animate-success-check" />
+                </div>
+
+                <h1 className="text-2xl">تم ربط تيليجرام بنجاح</h1>
+
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    حسابك متصل بتيليجرام. هنبعتلك الإشعارات المهمة على البوت.
+                </p>
+
+                <Button asChild className="mt-6 w-full">
+                    <Link href="/dashboard">العودة للوحة التحكم</Link>
+                </Button>
+            </div>
+        </main>
+    );
+}
+
+return (
+    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+        <div className="w-full max-w-sm">
+            <div className="text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                    <Send className="h-7 w-7 text-primary" />
+                </div>
+
+                <h1 className="text-2xl">اربط حسابك بتيليجرام</h1>
+
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    خليك متابع إشعارات صنايعي.كوم من تيليجرام بسهولة.
+                </p>
+            </div>
+
+            <ol className="relative mt-8">
+                <span
+                    aria-hidden="true"
+                    className="absolute start-4 top-4 bottom-4 w-px bg-border"
+                />
+
+                <li className="relative flex gap-4 pb-6">
+                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground">
+                        1
+                    </span>
+                    <div className="pt-1">
+                        <p className="text-sm font-medium text-foreground">
+                            افتح البوت
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            اضغط على الزر علشان تفتح البوت الخاص بحسابك.
+                        </p>
+                    </div>
+                </li>
+
+                <li className="relative flex gap-4 pb-6">
+                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground">
+                        2
+                    </span>
+                    <div className="pt-1">
+                        <p className="text-sm font-medium text-foreground">
+                            اضغط Start او زر البدأ
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            تيليجرام هيكمل عملية الربط تلقائيًا.
+                        </p>
+                    </div>
+                </li>
+
+                <li className="relative flex gap-4">
+                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold text-foreground">
+                        3
+                    </span>
+                    <div className="pt-1">
+                        <p className="text-sm font-medium text-foreground">
+                            تم الربط
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            الصفحة هتتحدث تلقائيًا بعد نجاح الربط.
+                        </p>
+                    </div>
+                </li>
+            </ol>
+
+            {telegramUrl && (
+                <p className="mt-6 text-center text-xs text-muted-foreground">
+                    لو تيليجرام ما فتحش تلقائيًا، اضغط الزر مرة تانية.
+                </p>
+            )}
+
+            <Button
+                onClick={handleConnect}
+                disabled={connecting}
+                className="mt-6 w-full"
+                size="lg"
+            >
+                {connecting ? (
+                    <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        جاري فتح تيليجرام...
+                    </>
+                ) : (
+                    <>
+                        <ExternalLink className="h-4 w-4" />
+                        {telegramUrl ? "فتح تيليجرام" : "ربط تيليجرام"}
+                    </>
+                )}
+            </Button>
+
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+                مش هنطلب منك كلمة سر تيليجرام أو أي بيانات حساسة.
+            </p>
+        </div>
+    </main>
+);
 }

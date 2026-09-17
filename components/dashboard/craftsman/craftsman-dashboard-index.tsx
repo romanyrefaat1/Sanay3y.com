@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/contexts/user-context";
 import { createClient } from "@/lib/supabase/client";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type JobStats = {
     total: number;
@@ -170,6 +171,7 @@ export default function CraftsmanDashboardIndex() {
                     </Link>
                 </div>
             </div>
+            <TelegramConnectAlert />
 
             <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                 {/* Sidebar */}

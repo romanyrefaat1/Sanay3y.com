@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import FindFilters from "./find-filters";
 import JobList from "./job-list";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type SearchParams = {
     service?: string;
@@ -123,7 +124,7 @@ async function CraftsmanFindContent({
                         }
                         distance={String(distanceKm)}
                     />
-
+                    <TelegramConnectAlert />
                     <JobList
                         jobs={[]}
                         appliedJobIds={[]}

@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
     getTelegramBotUsername,
 } from "@/lib/telegram";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type BotType = "client" | "craftsman";
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const admin = createAdminClient();
+        const admin = supabaseAdmin
 
         /*
          * Check whether this user already has an active

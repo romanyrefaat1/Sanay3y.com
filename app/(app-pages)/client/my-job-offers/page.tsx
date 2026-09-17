@@ -23,6 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 import { createClient } from "@/lib/supabase/server";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type Job = {
     id: string;
@@ -372,6 +373,8 @@ export default async function ClientMyWorkPage({
     iconClassName="bg-green-500/10 text-green-400"
 />
                 </div>
+
+                <TelegramConnectAlert />
 
                 {/* Active filter */}
                 {activeStatus && (

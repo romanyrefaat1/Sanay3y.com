@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/contexts/user-context";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 const serviceTypes = [
     "سباكة",
@@ -848,6 +849,7 @@ export default function CreateJobPage() {
                     </>
                 )}
             </div>
+            <TelegramConnectAlert />
 
             {/* Craftsman error */}
             {craftsmanId &&

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { TelegramConnectAlert } from "../connect-telegram-alert";
 
 type ChatItem = {
     id: string;
@@ -152,7 +153,6 @@ export default function ChatInbox({
 
     return (
         <div
-            dir="rtl"
             className="mx-auto flex w-full max-w-5xl flex-col px-4 py-6"
         >
             {/* Header */}
@@ -193,6 +193,8 @@ export default function ChatInbox({
                     </div>
                 </div>
             )}
+
+                <TelegramConnectAlert />
 
             {/* Empty */}
             {initialChats.length === 0 ? (

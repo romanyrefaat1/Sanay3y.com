@@ -26,6 +26,7 @@ import JobApplicationForm from "@/components/jobs/job-application-form";
 import { JobApplicationsList } from "@/components/jobs/job-applications-list";
 import { FinishJobButton } from "@/components/jobs/finish-job-button";
 import { ApplicationScrollHandler } from "./(components)/application-scroll-handler";
+import { TelegramConnectAlert } from "@/components/connect-telegram-alert";
 
 type PageProps = {
     params: Promise<{
@@ -604,6 +605,8 @@ export default async function JobDetailsPage({
                         clientId={job.client_id}
                     />
                 )}
+
+                <TelegramConnectAlert />
 
                 {isOwner && (
                     <JobApplicationsList
