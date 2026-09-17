@@ -42,7 +42,7 @@ export default async function AppRoutesLayout({
       </div>
 
       {/* pb-20 reserves space so the mobile bottom nav never covers content */}
-      <main className={role ? "pb-20 md:pb-0" : undefined}>
+      <main className={role ? "pb-20 md:pb-0 mt-8" : undefined}>
         {children}
       </main>
     </div>

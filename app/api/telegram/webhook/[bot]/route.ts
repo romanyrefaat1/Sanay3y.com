@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
     getTelegramWebhookSecret,
     sendTelegramMessage,
 } from "@/lib/telegram";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 type BotType = "client" | "craftsman";
 
@@ -140,7 +140,7 @@ ${TELEGRAM_CONNECT_URL}
             });
         }
 
-        const admin = createAdminClient();
+        const admin = supabaseAdmin;
 
         /*
          * Find the temporary connection token.

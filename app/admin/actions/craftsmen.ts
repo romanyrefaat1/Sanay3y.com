@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 function normalizeEgyptianPhone(phone: string) {
   const value = phone.trim().replace(/\s+/g, "");
@@ -106,7 +106,7 @@ export async function createCraftsman(
         .filter(Boolean)
     : [];
 
-  const admin = createAdminClient();
+  const admin = supabaseAdmin;
 
   /*
    * Create the Auth account.

@@ -1,5 +1,5 @@
-import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { supabaseAdmin } from "./supabase/admin";
 
 type BotType = "client" | "craftsman";
 
@@ -12,7 +12,7 @@ export async function sendTelegramNotification({
     botType: BotType;
     message: string;
 }) {
-    const admin = createAdminClient();
+    const admin = supabaseAdmin;
 
     const { data: connection, error } = await admin
         .from("telegram_connections")
