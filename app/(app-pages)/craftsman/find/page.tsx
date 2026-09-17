@@ -211,6 +211,7 @@ async function CraftsmanFindContent({
                 maxBudget={searchParams.maxBudget ?? ""}
                 distance={String(distanceKm)}
             />
+            <TelegramConnectAlert />
 
             <JobList
                 jobs={jobs ?? []}
