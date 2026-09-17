@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  ArrowUpLeft,
   ChevronDown,
   Clock3,
   Menu,
@@ -14,11 +13,7 @@ import {
   Zap,
   Wrench,
 } from "lucide-react";
-
-// TODO before shipping: replace with a real Supabase count query.
-// Do not hardcode this — it must reflect the actual craftsman table,
-// filtered to Faisal. If it drops below what's shown here, the page lies.
-const CRAFTSMEN_IN_FAISAL = 50;
+import { Button } from "@/components/ui/button";
 
 const exampleApplicants = [
   { name: "أحمد محمد", experience: "8 سنين خبرة", initials: "أم" },
@@ -62,7 +57,7 @@ export default function HomePage() {
       className="min-h-screen overflow-x-hidden bg-background text-foreground selection:bg-primary selection:text-primary-foreground"
     >
       {/* =========================================================
-          NAVBAR
+          NAVBAR — الصفحة مخصصة للعميل فقط (روابط "أنا صنايعي" اتشالت)
           ========================================================= */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -74,18 +69,17 @@ export default function HomePage() {
             صنايعي<span className="text-primary">.</span>كوم
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex" aria-label="التنقل الرئيسي">
-            <Link
-              href="/craftsman/auth/sign-up"
-              className="text-sm font-semibold text-foreground/80 underline decoration-primary/40 decoration-2 underline-offset-4 transition-colors hover:text-foreground"
-            >
-              أنا صنايعي
+          <nav className="hidden items-center gap-4 md:flex" aria-label="التنقل الرئيسي">
+            <Link href="/auth/login" className="inline-flex h-9">
+              <Button variant="ghost" className="hover:bg-transparent">
+                دخول
+              </Button>
             </Link>
-            <Link
-              href="/auth/login"
-              className="inline-flex h-9 items-center justify-center bg-foreground px-4 text-sm font-bold text-background transition-opacity hover:opacity-85"
-            >
-              دخول
+
+            <Link href="/client/auth/sign-up">
+              <Button className="inline-flex h-9 items-center justify-center bg-foreground px-4 text-sm font-bold text-background transition-colors hover:bg-primary-foreground/90">
+                اعمل حساب جديد
+              </Button>
             </Link>
           </nav>
 
@@ -102,20 +96,31 @@ export default function HomePage() {
 
         {mobileMenuOpen && (
           <div className="border-t border-border bg-background md:hidden">
-            <nav className="mx-auto flex w-full max-w-7xl flex-col px-4 py-2 sm:px-6" aria-label="قائمة الهاتف">
-              <Link
-                href="/craftsman/auth/sign-up"
-                onClick={() => setMobileMenuOpen(false)}
-                className="border-b border-border py-4 text-sm font-semibold"
-              >
-                أنا صنايعي
-              </Link>
+            <nav
+              className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6"
+              aria-label="قائمة الهاتف"
+            >
               <Link
                 href="/auth/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="py-4 text-sm font-semibold"
+                className="w-full"
               >
-                دخول
+                <Button
+                  variant="ghost"
+                  className="h-11 w-full justify-center text-sm font-semibold hover:bg-muted"
+                >
+                  دخول
+                </Button>
+              </Link>
+
+              <Link
+                href="/client/auth/sign-up"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full"
+              >
+                <Button className="h-11 w-full justify-center bg-foreground text-sm font-bold text-background hover:bg-primary">
+                  اعمل حساب جديد
+                </Button>
               </Link>
             </nav>
           </div>
@@ -123,11 +128,7 @@ export default function HomePage() {
       </header>
 
       {/* =========================================================
-          HERO — headline carries the doubt/confusion (the real
-          insight, per CRO analysis), subline carries the one
-          honest proof point we have: real craftsman density in
-          Faisal. No fake completion stats — we haven't shipped
-          a finished job yet, so we don't claim one.
+          HERO — يفتح بكلمات تعكس خوف العميل والتركيز على مشكلته
           ========================================================= */}
       <section id="hero" className="scroll-mt-16 border-b border-border">
         <div className="mx-auto w-full max-w-7xl px-4 pt-14 sm:px-6 sm:pt-20 lg:px-8 lg:pt-24">
@@ -136,22 +137,26 @@ export default function HomePage() {
             متاح حاليًا — فيصل، الجيزة
           </div>
 
-          <h1 className="mt-6 font-cairo text-[13vw] font-bold leading-[0.95] tracking-tight sm:text-[9vw] lg:text-[100px]">
-            مش عارف
+          <h1 className="mt-6 font-cairo text-[12vw] font-bold leading-[0.95] tracking-tight sm:text-[8vw] lg:text-[88px]">
+            صنايعية في فيصل
             <br />
-            تجيب مين؟
+            للسباكة والكهرباء
           </h1>
 
-          <p className="mt-6 max-w-md text-lg leading-8 text-muted-foreground">
-            <span className="font-bold text-foreground">
-              +{CRAFTSMEN_IN_FAISAL} صنايعي في فيصل
-            </span>{" "}
-            مستنيين يشتغلوا. اكتب المشكلة زي ما هي، من غير مصطلحات، وهيشوفوا طلبك.
+          <p className="mt-6 max-w-2xl font-cairo text-3xl font-bold leading-tight sm:text-4xl">
+            مش عارف تجيب مين؟
+          </p>
+
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">
+            عندك مشكلة في البيت ومش عارف تبدأ منين؟ اكتب اللي حاصل زي ما هو، من غير ما تعرف اسم العطل أو المصطلح الصح، والصنايعية المناسبين يقدروا يشوفوا طلبك ويتقدموا لك.
+          </p>
+
+          <p className="mt-3 max-w-2xl text-base font-semibold leading-7 text-foreground">
+            مش لازم تلف وتسأل على صنايعي. إنت اكتب الشغل، وإحنا نساعدك تلاقي مين يناسبه.
           </p>
         </div>
 
-        {/* Job-ticket input: the signature element. Reads like a
-            torn notice, not a dashboard card. */}
+        {/* Job input box */}
         <div className="mx-auto mt-10 w-full max-w-7xl px-4 pb-14 sm:px-6 lg:px-8 lg:pb-20">
           <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
             <form onSubmit={handleSubmit} noValidate>
@@ -170,7 +175,7 @@ export default function HomePage() {
                 </div>
 
                 <label htmlFor="job-description" className="sr-only">
-                  اكتب الشغل اللي محتاج يتعمل
+                  اكتب المشكلة زي ما هي
                 </label>
                 <textarea
                   id="job-description"
@@ -187,8 +192,10 @@ export default function HomePage() {
                   className="block min-h-[160px] w-full resize-none border-0 bg-transparent px-5 py-5 font-cairo text-xl font-bold leading-8 text-foreground outline-none placeholder:text-muted-foreground/50 focus:ring-0"
                 />
 
-                <div className="flex items-center justify-between px-5 pb-5">
-                  <p className="text-xs text-muted-foreground/70">اكتبها بطريقتك، من غير مصطلحات.</p>
+                <div className="flex flex-col gap-4 px-5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground/70">
+                    اكتبها بطريقتك — من غير ما تتصنّع فهم في حاجة مش شغلتك.
+                  </p>
                   <button
                     type="submit"
                     disabled={isSubmitting}
@@ -207,7 +214,7 @@ export default function HomePage() {
               )}
             </form>
 
-            {/* Live-updating outcome strip — grounded, not a fake dashboard */}
+            {/* Outcome preview card */}
             <div className="flex flex-col justify-between border-2 border-dashed border-border p-6">
               <div>
                 <p className="text-xs font-bold text-muted-foreground/70">
@@ -223,6 +230,7 @@ export default function HomePage() {
               </div>
 
               <div className="mt-8 space-y-2.5">
+                <p className="text-xs font-bold text-muted-foreground">قائمة المتقدمين</p>
                 {exampleApplicants.map((applicant) => (
                   <div
                     key={applicant.name}
@@ -238,99 +246,27 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
+
+              <div className="mt-6 flex items-center gap-2 border-t border-border pt-4 text-xs font-semibold text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                كل صنايعي هنا اتحقق رقمه قبل ما يظهرلك.
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* =========================================================
-          TWO PATHS — the section that was completely missing.
-          Client and craftsman get equal visual weight, distinct
-          CTA styling so neither reads as secondary. This is the
-          direct fix for "50+ craftsmen and the page never speaks
-          to them."
-          ========================================================= */}
-      <section className="border-b border-border bg-secondary/40">
-        <div className="mx-auto w-full max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-16">
-          <div className="grid gap-6 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-x-reverse sm:divide-border">
-            <div className="flex flex-col justify-between gap-6 sm:pl-10">
-              <div>
-                <p className="font-cairo text-2xl font-bold">عندك شغل؟</p>
-                <p className="mt-2 max-w-xs text-sm leading-7 text-muted-foreground">
-                  اكتب المشكلة، واستنى الصنايعية يتقدموا لطلبك.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={scrollToHero}
-                className="inline-flex h-11 w-fit items-center justify-center gap-2 bg-primary px-6 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                ابدأ طلبك
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="flex flex-col justify-between gap-6 sm:pr-10">
-              <div>
-                <p className="font-cairo text-2xl font-bold">إنت صنايعي؟</p>
-                <p className="mt-2 max-w-xs text-sm leading-7 text-muted-foreground">
-                  استقبل طلبات شغل حقيقية من عملاء في فيصل، وحدد المناطق اللي تناسبك.
-                </p>
-              </div>
-              <Link
-                href="/craftsman/auth/sign-up"
-                className="inline-flex h-11 w-fit items-center justify-center gap-2 border-2 border-primary px-6 text-sm font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
-              >
-                سجل كصنايعي
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          FLOW — connected horizontal arrows, not numbered cards.
+          TRUST — اعرف مين هتتعامل معاه قبل ما تختاره
           ========================================================= */}
       <section className="border-b border-border bg-card">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <h2 className="max-w-lg font-cairo text-3xl font-bold leading-tight sm:text-4xl">
-            من الوصف للشغل الخلصان — من غير لف ودوران.
-          </h2>
-
-          <div className="mt-12 flex flex-col gap-0 sm:flex-row sm:items-stretch">
-            {[
-              { label: "اكتب المشكلة", detail: "بطريقتك، من غير مصطلحات" },
-              { label: "الصنايعية يتقدموا", detail: "القريبين منك ومتخصصين في نوع الشغل" },
-              { label: "اختار وابدأ", detail: "قارن، اتفق، وابدأ التنفيذ" },
-            ].map((step, i, arr) => (
-              <div key={step.label} className="flex flex-1 items-stretch">
-                <div className="flex-1 py-2">
-                  <p className="font-cairo text-lg font-bold">{step.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{step.detail}</p>
-                </div>
-                {i < arr.length - 1 && (
-                  <div className="hidden w-16 shrink-0 items-center justify-center sm:flex">
-                    <ArrowLeft className="h-5 w-5 text-primary" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          PROFILE + TRUST — folds verification into the same
-          section as "what you see before choosing." Only ship
-          the verification line if phone verification is actually
-          enforced in the DB — otherwise cut it, don't soften it.
-          ========================================================= */}
-      <section className="border-b border-border">
-        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-          <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-            <div className="border-2 border-border bg-card p-6 sm:p-8">
-              <div className="flex items-start gap-4">
+          <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:gap-16">
+            <div className="border-2 border-border bg-background p-6 sm:p-8">
+              <p className="text-xs font-bold text-muted-foreground/70">
+                مثال توضيحي — مش بيانات حقيقية
+              </p>
+              <div className="mt-5 flex items-start gap-4">
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center bg-accent font-cairo text-lg font-bold text-accent-foreground">
                   أم
                 </div>
@@ -352,7 +288,7 @@ export default function HomePage() {
                 <div>
                   <p className="text-xs text-muted-foreground/70">التقييمات</p>
                   <p className="mt-1 text-sm font-semibold text-muted-foreground">
-                    تظهر بعد 5 أعمال مكتملة
+                    تظهر بعد عدد أعمال كافي
                   </p>
                 </div>
               </div>
@@ -367,29 +303,152 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
+
+              <div className="mt-6 flex items-center gap-2 border-t border-border pt-4 text-xs font-semibold text-muted-foreground">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                كل صنايعي هنا اتحقق رقمه قبل ما يظهرلك.
+              </div>
             </div>
 
             <div className="flex flex-col justify-center">
               <p className="text-xs font-bold text-primary">
                 قبل ما تختار
               </p>
-              <p className="mt-4 font-cairo text-3xl font-bold leading-snug sm:text-4xl">
-                مش مجرد اسم ورقم.
-              </p>
+              <h2 className="mt-4 font-cairo text-3xl font-bold leading-snug sm:text-4xl">
+                اعرف مين هتتعامل معاه قبل ما تختاره
+              </h2>
               <p className="mt-5 max-w-md text-base leading-8 text-muted-foreground">
-                تراجع خبرة كل صنايعي وأعماله السابقة قبل ما تتفق معاه. لو عنده
-                عدد أعمال مكتملة كافي، تقدر تشوف تقييماته كمان.
+                مش هتختار شخص مجهول من غير أي معلومات. تقدر تشوف البيانات المتاحة عن الصنايعي وخبرته وتخصصه ومنطقة شغله قبل ما توافق عليه.
               </p>
               <p className="mt-4 max-w-md text-sm leading-7 text-muted-foreground/80">
-                مبنعرضش تقييم لملف لسه مبيعملش عدد كافي من الشغل — عشان
-                رأي واحد أو اتنين ميدّيش صورة حقيقية.
+                وكل صنايعي بيتم <strong className="text-foreground">التحقق من رقم هاتفه قبل ظهوره على المنصة.</strong>
+              </p>
+              <p className="mt-4 max-w-md border-t border-border pt-4 text-sm leading-7 text-muted-foreground/80">
+                التحقق من رقم الهاتف لا يعني إن المنصة تضمن جودة كل شغلانة، عشان كده بنخليك تشوف المعلومات المتاحة وتختار بنفسك.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          PRICE — اتفق على السعر قبل ما يبدأ الشغل
+          ========================================================= */}
+      <section className="border-b border-border">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-bold text-primary">قبل ما تبدأ</p>
+            <h2 className="mt-4 font-cairo text-3xl font-bold leading-snug sm:text-4xl">
+              قلقان يتغيّر عليك السعر في الآخر؟
+            </h2>
+            <p className="mt-5 text-base leading-8 text-muted-foreground sm:text-lg">
+              كتير من المشاكل بتحصل لأن محدش اتفق على السعر والتفاصيل من البداية. على صنايعي.كوم تقدر تتكلم مع الصنايعي وتتفقوا على السعر والتفاصيل <strong className="text-foreground">قبل ما يبدأ الشغل.</strong>
+            </p>
+            <p className="mt-4 text-sm leading-7 text-muted-foreground/80">
+              مفيش سعر ثابت بتفرضه المنصة، والاتفاق النهائي بيكون بينك وبين الصنايعي.
+            </p>
+            <p className="mt-6 border-t border-border pt-5 text-sm font-semibold text-foreground">
+              اتفق الأول، وبعدها ابدأ الشغل.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          FLOW (3 خطوات)
+          ========================================================= */}
+      <section className="border-b border-border">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <h2 className="max-w-xl font-cairo text-3xl font-bold leading-tight sm:text-4xl">
+            من الوصف للشغل الخلصان
+          </h2>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
+            مش لازم تلف وتسأل، ومش لازم تعرف اسم العطل. اكتب الشغل، شوف المتقدمين، واختار اللي يناسبك.
+          </p>
+
+          <div className="mt-12 flex flex-col gap-0 sm:flex-row sm:items-stretch">
+            {[
+              { label: "1. اكتب اللي حاصل", detail: "بطريقتك، من غير مصطلحات أو أسماء خدمات" },
+              { label: "2. الصنايعية المناسبين يشوفوا طلبك", detail: "المتخصصين في نوع الشغل ومناطق الخدمة المناسبة يقدروا يتقدموا" },
+              { label: "3. شوف واختار", detail: "قارن بين المتقدمين، اتكلم، واتفق على السعر والتفاصيل" },
+              { label: "4. ابدأ الشغل", detail: "بعد ما تتفقوا، يبدأ تنفيذ الشغل" },
+            ].map((step, i, arr) => (
+              <div key={step.label} className="flex flex-1 items-stretch">
+                <div className="flex-1 py-2">
+                  <p className="font-cairo text-lg font-bold">{step.label}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{step.detail}</p>
+                </div>
+                {i < arr.length - 1 && (
+                  <div className="hidden w-16 shrink-0 items-center justify-center sm:flex">
+                    <ArrowLeft className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          BENEFITS — الفوائد التي تهم العميل والصنايعي
+          ========================================================= */}
+      <section className="border-b border-border bg-card">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:gap-16">
+            <div>
+              <p className="text-xs font-bold text-primary">
+                مش لازم تفضل فاتح الموقع
+              </p>
+              <h2 className="mt-4 font-cairo text-3xl font-bold leading-snug sm:text-4xl">
+                خلي التحديثات المهمة توصلك.
+              </h2>
+              <p className="mt-4 max-w-xl text-base leading-8 text-muted-foreground">
+                مش كل شوية تدخل تشوف حد اتقدم على طلبك ولا لأ. اربط حسابك بتيليجرام وخلي التحديثات المهمة توصلك مباشرة.
               </p>
 
-              {/* TODO: only keep this block if phone verification is
-                  actually enforced before a craftsman profile goes live. */}
-              <div className="mt-6 flex items-center gap-2.5 border-t border-border pt-6 text-sm font-semibold text-foreground">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
-                بنتحقق من رقم كل صنايعي قبل ما يظهر في المنصة.
+              <div className="mt-8 grid gap-6 sm:grid-cols-2">
+                <div className="border border-border bg-background p-5">
+                  <h3 className="font-cairo text-lg font-bold">للعميل</h3>
+                  <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+                    <p>حد اتقدم على طلبك؟ <strong className="text-foreground">هتعرف.</strong></p>
+                    <p>فيه رسالة جديدة؟ <strong className="text-foreground">هتعرف.</strong></p>
+                    <p>حصل تحديث مهم على طلبك؟ <strong className="text-foreground">هتعرف.</strong></p>
+                  </div>
+                </div>
+
+                <div className="border border-border bg-background p-5">
+                  <h3 className="font-cairo text-lg font-bold">وللصنايعي</h3>
+                  <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+                    <p>ظهر طلب مناسب لتخصصك ومنطقتك؟ <strong className="text-foreground">هتعرف.</strong></p>
+                    <p>حد رد عليك؟ <strong className="text-foreground">هتعرف.</strong></p>
+                    <p>حصل تحديث على طلب بتشارك فيه؟ <strong className="text-foreground">هتعرف.</strong></p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-6 border-t border-border pt-5 text-sm font-bold text-foreground">
+                الموقع مش لازم يفضل مفتوح قدامك.
+              </p>
+            </div>
+
+            <div className="flex flex-col justify-center border-2 border-dashed border-border bg-background p-6 sm:p-8">
+              <p className="text-xs font-bold text-muted-foreground/70">
+                الفكرة ببساطة
+              </p>
+              <h3 className="mt-4 font-cairo text-2xl font-bold leading-9">
+                إنت تكتب الشغل مرة، والمنصة تساعدك تتابعه من غير ما تفتكر تدخل كل شوية.
+              </h3>
+              <div className="mt-8 space-y-4">
+                {[
+                  "تنشر طلبك",
+                  "الصنايعية المناسبين يشوفوه ويتقدموا",
+                  "التحديثات المهمة توصلك على تيليجرام",
+                ].map((item, index) => (
+                  <div key={item} className="flex items-start gap-4 border-b border-border pb-4 last:border-b-0 last:pb-0">
+                    <span className="font-cairo text-sm font-bold text-primary">0{index + 1}</span>
+                    <span className="text-sm font-semibold leading-6">{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -397,27 +456,56 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================
-          LOCAL COVERAGE — reframes "no completed jobs yet" as an
-          honest early-launch statement instead of hiding it.
+          CRAFTSMAN — فائدة التسجيل للصنايعي
+          ========================================================= */}
+      <section className="border-b border-border">
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-bold text-primary">
+                للصنايعية
+              </p>
+              <h2 className="mt-4 font-cairo text-3xl font-bold leading-snug sm:text-4xl">
+                صنايعي؟ خلي الشغل المناسب يوصلك.
+              </h2>
+              <p className="mt-4 max-w-2xl text-base leading-8 text-muted-foreground">
+                بدل ما تفضل تدور على شغل أو تستنى حد يسأل عليك، حدد تخصصك والمناطق اللي بتشتغل فيها. لما يظهر طلب مناسب ليك، تقدر تشوف تفاصيله وتتقدم له. واربط تيليجرام عشان تعرف بالطلبات والتحديثات الجديدة من غير ما تفضل داخل الموقع.
+              </p>
+            </div>
+
+            <Link href="/craftsman/auth/sign-up" className="shrink-0">
+              <Button className="h-12 bg-primary px-7 text-sm font-bold text-primary-foreground hover:bg-primary/90">
+                سجل كصنايعي
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          بدأنا بفيصل وبخدمتين بس — التعديل من اعتذار لميزة
           ========================================================= */}
       <section className="border-b border-border bg-card">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="font-cairo text-3xl font-bold sm:text-4xl">
-                بنطلق دلوقتي في فيصل.
+              <h2 className="font-cairo text-3xl font-bold sm:text-4xl">
+                بدأنا بفيصل، وبخدمتين بس — ليه؟
+              </h2>
+              <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
+                لأننا مش عايزين نفتح كل المناطق وكل الخدمات ونسيب الناس لوحدها. حاليًا بنركز على <strong className="text-foreground">فيصل</strong> وعلى <strong className="text-foreground">السباكة والكهرباء</strong>، ونبني شبكة من الصنايعية والعملاء في منطقة محددة قبل ما نتوسع.
               </p>
-              <p className="mt-3 max-w-md text-base leading-7 text-muted-foreground">
-                حاليًا بخدمات الكهرباء والسباكة المنزلية بس — مش عايزين
-                نوعدك بأكتر من اللي عندنا فعلاً. كن من أول اللي يجربوا الخدمة.
+              <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground/80">
+                يعني لو إنت في فيصل ومحتاج سباك أو كهربائي، تقدر تبدأ من هنا.
               </p>
             </div>
 
             <div className="flex gap-3">
-              <span className="inline-flex items-center gap-2 border border-border px-4 py-2.5 text-sm font-semibold">
+              <span className="inline-flex items-center gap-2 border border-border bg-background px-4 py-2.5 text-sm font-semibold">
                 <Zap className="h-4 w-4 text-primary" /> كهرباء
               </span>
-              <span className="inline-flex items-center gap-2 border border-border px-4 py-2.5 text-sm font-semibold">
+              <span className="inline-flex items-center gap-2 border border-border bg-background px-4 py-2.5 text-sm font-semibold">
                 <Wrench className="h-4 w-4 text-primary" /> سباكة
               </span>
             </div>
@@ -426,8 +514,7 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================
-          FAQ — added a pricing-expectation answer per the CRO
-          fix (no fake price range, just the honest process).
+          FAQ — الترتيب الجديد حسب الأولوية
           ========================================================= */}
       <section className="border-b border-border">
         <div className="mx-auto w-full max-w-3xl px-4 py-16 sm:px-6 lg:py-20">
@@ -438,24 +525,32 @@ export default function HomePage() {
           <div className="mt-10 border-t border-border">
             {[
               {
-                q: "هل لازم أكون عارف اسم الخدمة؟",
-                a: "لا. اكتب المشكلة أو الشغل اللي محتاج يتعمل بطريقتك، وكمل باقي تفاصيل الطلب بعد كده.",
+                q: "هل صنايعي.كوم موقع موثوق؟",
+                a: "كل صنايعي بيتم التحقق من رقم هاتفه قبل ظهوره على المنصة، وتقدر تشوف المعلومات المتاحة عنه وخبرته قبل ما تختاره. إنت اللي بتوافق على الصنايعي، وإنت اللي بتتفق معاه على تفاصيل الشغل والسعر قبل البداية.",
+              },
+              {
+                q: "هل السعر هيتغير بعد ما الصنايعي يخلص؟",
+                a: "مفيش سعر ثابت بتحدده المنصة. إحنا بننصحك تتفق مع الصنايعي على السعر والتفاصيل قبل ما يبدأ الشغل عشان تقلل فرصة المفاجآت في النهاية. الاتفاق النهائي بيكون بينك وبين الصنايعي.",
+              },
+              {
+                q: "هل لازم أكون عارف اسم الخدمة أو المصطلح التقني؟",
+                a: "لا. اكتب المشكلة زي ما بتحس بيها وبالطريقة اللي تقدر توصفها بيها. مش لازم تعرف اسم العطل أو اسم الخدمة المطلوبة.",
               },
               {
                 q: "هل أنا اللي باختار الصنايعي؟",
-                a: "أيوه. الصنايعية يتقدموا للطلب، وأنت تراجع المعلومات المتاحة عنهم وتختار الشخص اللي يناسبك.",
-              },
-              {
-                q: "في سعر ثابت للخدمة؟",
-                a: "لأ، مفيش سعر ثابت. الصنايعي بيشوف تفاصيل شغلك ويديك سعر يناسب الحالة، وأنت تتفق معاه قبل ما يبدأ.",
+                a: "أيوه. الصنايعية يقدروا يتقدموا على طلبك، وإنت بتشوف المتقدمين وتختار اللي يناسبك قبل ما تبدأوا الشغل.",
               },
               {
                 q: "هل لازم أعمل حساب قبل ما أبدأ؟",
-                a: "تقدر تبدأ بكتابة وصف الشغل مباشرة. هتحتاج حساب عشان تكمل وتنشر الطلب.",
+                a: "تقدر تبدأ بكتابة تفاصيل طلبك، وعند إنشاء الطلب أو إكمال الخطوات المطلوبة هتحتاج تعمل حساب عشان تقدر تتابع طلبك وتتواصل مع الصنايعي.",
               },
               {
                 q: "هل الخدمة متاحة في كل المناطق؟",
-                a: "حاليًا بنبدأ من فيصل، بخدمات السباكة والكهرباء المنزلية. التغطية هتتوسع مع نمو المنصة.",
+                a: "حاليًا صنايعي.كوم متاح في فيصل، الجيزة، وبنبدأ بخدمات السباكة والكهرباء. هنوسع المناطق والخدمات تدريجيًا بعد ما نبني شبكة قوية في البداية.",
+              },
+              {
+                q: "هل التقييمات موجودة لكل الصنايعية؟",
+                a: "مش بنعرض تقييمًا لملف لسه مبيعملش عدد كافي من الأعمال، لأن رأي واحد أو اتنين مش بالضرورة يكون صورة عادلة عن مستوى الصنايعي. لما يظهر تقييم على المنصة، بنكون حريصين إنه يكون مبني على عدد كافٍ من الأعمال.",
               },
             ].map((item) => (
               <details key={item.q} className="group border-b border-border">
@@ -473,42 +568,32 @@ export default function HomePage() {
       </section>
 
       {/* =========================================================
-          FINAL CTA — flat primary, two paths again so a craftsman
-          who scrolled all the way down still isn't stranded.
+          FINAL CTA — زرار واحد مخصص للعميل
           ========================================================= */}
       <section className="border-b border-border">
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <div className="flex flex-col items-start justify-between gap-8 bg-primary px-6 py-14 text-primary-foreground sm:px-10 lg:flex-row lg:items-center">
+          <div className="flex flex-col items-start justify-between gap-8 bg-primary px-6 py-14 text-primary-foreground sm:px-10 sm:flex-row sm:items-center">
             <p className="font-cairo text-3xl font-bold leading-tight sm:text-4xl">
-              عندك شغل، ولا إنت صنايعي؟
+              عندك شغل محتاج يتعمل؟
             </p>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={scrollToHero}
-                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 bg-background px-7 text-sm font-bold text-foreground transition-transform hover:-translate-y-0.5"
-              >
-                اطلب صنايعي
-                <ArrowUpLeft className="h-4 w-4" />
-              </button>
-              <Link
-                href="/craftsman/auth/sign-up"
-                className="inline-flex h-12 shrink-0 items-center justify-center gap-2 border-2 border-background px-7 text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5"
-              >
-                سجل كصنايعي
-                <ArrowUpLeft className="h-4 w-4" />
-              </Link>
-            </div>
+            <button
+              type="button"
+              onClick={scrollToHero}
+              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 bg-background px-7 text-sm font-bold text-foreground transition-transform hover:-translate-y-0.5"
+            >
+              اطلب صنايعي دلوقتي
+              <ArrowLeft className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </section>
 
       {/* =========================================================
-          FOOTER
+          FOOTER — رابط خفيف ومستقل للصنايعي في الأسفل
           ========================================================= */}
       <footer className="bg-card">
         <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-          <div className="grid gap-10 md:grid-cols-[1.6fr_1fr_1fr]">
+          <div className="grid gap-10 md:grid-cols-[1.6fr_1fr]">
             <div>
               <Link href="/" className="font-cairo text-xl font-bold tracking-tight">
                 صنايعي<span className="text-primary">.</span>كوم
@@ -519,27 +604,28 @@ export default function HomePage() {
             </div>
 
             <div>
-              <h3 className="font-cairo text-sm font-bold">للعملاء</h3>
+              <h3 className="font-cairo text-sm font-bold">روابط سريعة</h3>
               <div className="mt-4 flex flex-col gap-3 text-sm">
                 <Link href="/client/job/new" className="text-muted-foreground hover:text-foreground">إنشاء طلب</Link>
-                <Link href="/dashboard" className="text-muted-foreground hover:text-foreground">طلباتي</Link>
                 <Link href="/auth/login" className="text-muted-foreground hover:text-foreground">دخول</Link>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-cairo text-sm font-bold">للصنايعية</h3>
-              <div className="mt-4 flex flex-col gap-3 text-sm">
-                <Link href="/craftsman/auth/sign-up" className="text-muted-foreground hover:text-foreground">انضم كصنايعي</Link>
                 <Link href="/privacy" className="text-muted-foreground hover:text-foreground">الخصوصية</Link>
                 <Link href="/terms" className="text-muted-foreground hover:text-foreground">الشروط والأحكام</Link>
-                <Link href="/contact" className="text-muted-foreground hover:text-foreground">تواصل معنا</Link>
               </div>
             </div>
           </div>
 
-          <div className="mt-10 border-t border-border pt-6">
-            <p className="text-center text-xs text-muted-foreground/70">© 2026 صنايعي.كوم</p>
+          <div className="mt-10 border-t border-border pt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <p className="text-xs text-muted-foreground/70">© 2026 صنايعي.كوم</p>
+            
+            <div className="text-xs text-muted-foreground">
+              <span>صنايعي؟ </span>
+              <Link
+                href="/craftsman/auth/sign-up"
+                className="font-bold text-foreground underline hover:text-primary"
+              >
+                سجل هنا ←
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

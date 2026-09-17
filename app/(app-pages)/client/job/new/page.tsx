@@ -8,7 +8,7 @@ import {
     useState,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     ArrowRight,
     BadgeCheck,
@@ -144,6 +144,8 @@ function getInitials(name: string) {
 
 export default function CreateJobPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+  const paramsDescription = searchParams.get('description');
 
     const supabase = useMemo(
         () => createClient(),
@@ -354,49 +356,49 @@ export default function CreateJobPage() {
      * Restore draft.
      */
     useEffect(() => {
-        if (!user || !draftKey) {
-            return;
-        }
+    if (!user || !draftKey) {
+        return;
+    }
 
-        let isMounted = true;
+    let isMounted = true;
 
-        try {
-            const savedDraft =
-                localStorage.getItem(draftKey);
+    try {
+        const savedDraft = localStorage.getItem(draftKey);
 
-            if (savedDraft) {
-                const draft = JSON.parse(
-                    savedDraft,
-                ) as Partial<JobDraft>;
+        if (savedDraft) {
+            const draft = JSON.parse(savedDraft) as Partial<JobDraft>;
 
-                if (!isMounted) {
-                    return;
-                }
-
-                setTitle(draft.title ?? "");
-                setDescription(
-                    draft.description ?? "",
-                );
-                setServiceType(
-                    draft.serviceType ?? "",
-                );
-                setBudget(draft.budget ?? "");
+            if (!isMounted) {
+                return;
             }
-        } catch (error) {
-            console.error(
-                "Failed to restore job draft:",
-                error,
+
+            setTitle(draft.title ?? "");
+
+            // URL description takes priority over saved draft
+            setDescription(
+                paramsDescription ?? draft.description ?? "",
             );
-        } finally {
-            if (isMounted) {
-                setIsDraftLoaded(true);
-            }
-        }
 
-        return () => {
-            isMounted = false;
-        };
-    }, [user, draftKey]);
+            setServiceType(draft.serviceType ?? "");
+            setBudget(draft.budget ?? "");
+        } else if (paramsDescription) {
+            setDescription(paramsDescription);
+        }
+    } catch (error) {
+        console.error(
+            "Failed to restore job draft:",
+            error,
+        );
+    } finally {
+        if (isMounted) {
+            setIsDraftLoaded(true);
+        }
+    }
+
+    return () => {
+        isMounted = false;
+    };
+}, [user, draftKey, paramsDescription]);
 
     /*
      * Save draft.
