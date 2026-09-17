@@ -37,7 +37,14 @@ const initialStats: DashboardStats = {
 };
 
 export default function ClientDashboardIndex() {
-    const { profile, clientProfile, isLoading } = useUser();
+    const {
+    profile,
+    clientProfile,
+    onboardingSteps,
+    completedSteps,
+    onboardingPercentage,
+    isLoading,
+} = useUser();
 
     const [stats, setStats] =
         useState<DashboardStats>(initialStats);
@@ -153,34 +160,6 @@ export default function ClientDashboardIndex() {
             cancelled = true;
         };
     }, [profile?.id]);
-
-    const onboardingSteps = [
-        {
-            label: "إضافة صورة شخصية",
-            completed: Boolean(profile?.avatar_url),
-        },
-        {
-            label: "إضافة رقم الهاتف",
-            completed: Boolean(clientProfile?.phone),
-        },
-        {
-            label: "تحديد النوع",
-            completed: Boolean(clientProfile?.gender),
-        },
-        {
-            label: "تحديد الموقع",
-            completed: Boolean(profile?.location),
-        },
-    ];
-
-    const completedSteps =
-        onboardingSteps.filter(
-            (step) => step.completed,
-        ).length;
-
-    const onboardingPercentage = Math.round(
-        (completedSteps / onboardingSteps.length) * 100,
-    );
 
     const editProfileHref =
         "/client/profile/edit?backTo=/dashboard&name='لوحة التحكم'";
@@ -328,92 +307,98 @@ export default function ClientDashboardIndex() {
                     </Link>
 
                     {/* Profile completion */}
-                    <Card>
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <h2 className="font-semibold">
-                                        أكمل ملفك
-                                    </h2>
+{onboardingSteps.some((item)=> item.completed !== true) && <Card>
+    <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+            <div>
+                <h2 className="font-semibold">
+                    كمّل ملفك
+                </h2>
 
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {completedSteps} من{" "}
-                                        {
-                                            onboardingSteps.length
-                                        }{" "}
-                                        مكتملة
-                                    </p>
-                                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                    {completedSteps} من{" "}
+                    {onboardingSteps.length} مكتملة
+                </p>
+            </div>
 
-                                <span className="text-sm font-semibold text-primary">
-                                    {
-                                        onboardingPercentage
-                                    }
-                                    %
-                                </span>
-                            </div>
+            <span className="text-sm font-semibold text-primary">
+                {onboardingPercentage}%
+            </span>
+        </div>
 
-                            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className="h-full rounded-full bg-primary transition-all"
-                                    style={{
-                                        width: `${onboardingPercentage}%`,
-                                    }}
-                                />
-                            </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{
+                    width: `${onboardingPercentage}%`,
+                }}
+            />
+        </div>
 
-                            <div className="mt-5 space-y-3">
-                                {onboardingSteps.map(
-                                    (step) => (
-                                        <div
-                                            key={step.label}
-                                            className="flex items-center gap-3"
-                                        >
-                                            {step.completed ? (
-                                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                                    <span className="text-xs">
-                                                        ✓
-                                                    </span>
-                                                </span>
-                                            ) : (
-                                                <span className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/30" />
-                                            )}
+        <div className="mt-5 space-y-2">
+            {[
+                ...onboardingSteps.filter(
+                    (step) => !step.completed,
+                ),
+                ...onboardingSteps.filter(
+                    (step) => step.completed,
+                ),
+            ].map((step) => (
+                <div
+                    key={step.label}
+                    className={
+                        step.completed
+                            ? "flex items-center gap-3 rounded-md px-2 py-2"
+                            : "flex items-center gap-3 px-2 py-2"
+                    }
+                >
+                    {step.completed ? (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <span className="text-xs">
+                                ✓
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-1 border-primary">
+                            <span className="h-1 w-1 rounded-full" />
+                        </span>
+                    )}
 
-                                            <span
-                                                className={
-                                                    step.completed
-                                                        ? "text-sm"
-                                                        : "text-sm text-muted-foreground"
-                                                }
-                                            >
-                                                {
-                                                    step.label
-                                                }
-                                            </span>
-                                        </div>
-                                    ),
-                                )}
-                            </div>
+                    <span
+                        className={
+                            step.completed
+                                ? "text-sm text-muted-foreground"
+                                : "text-sm font-medium text-foreground"
+                        }
+                    >
+                        {step.label}
+                    </span>
 
-                            {completedSteps <
-                                onboardingSteps.length && (
-                                <Link
-                                    href={
-                                        editProfileHref
-                                    }
-                                    className="mt-5 block"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full"
-                                    >
-                                        استكمال الملف
-                                    </Button>
-                                </Link>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {!step.completed && (
+                        <span className="mr-auto text-xs font-medium text-primary">
+                            مطلوب
+                        </span>
+                    )}
+                </div>
+            ))}
+        </div>
+
+        {completedSteps <
+            onboardingSteps.length && (
+            <Link
+                href={editProfileHref}
+                className="mt-5 block"
+            >
+                <Button
+                    size="sm"
+                    className="w-full"
+                >
+                    كمّل ملفك
+                </Button>
+            </Link>
+        )}
+    </CardContent>
+</Card>}
                 </aside>
 
                 {/* Main */}

@@ -1248,7 +1248,7 @@ export default function CraftsmanProfileEditPage() {
                 </Card>
 
                 {/* Verification */}
-                <Card>
+                {/* <Card>
                     <CardContent className="p-6">
                         <h2 className="font-semibold">
                             حالة التوثيق
@@ -1283,7 +1283,7 @@ export default function CraftsmanProfileEditPage() {
                             </Link>
                         </div>
                     </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* Messages */}
                 {error && (

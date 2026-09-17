@@ -62,6 +62,8 @@ type UserContextType = {
     clientProfile: ClientProfile | null;
     craftsmanProfile: CraftsmanProfile | null;
 
+    isTelegramConnected: boolean;
+
     onboardingSteps: OnboardingStep[];
     completedSteps: number;
     onboardingPercentage: number;
@@ -91,6 +93,9 @@ export function UserProvider({
     const [craftsmanProfile, setCraftsmanProfile] =
         useState<CraftsmanProfile | null>(null);
 
+    const [isTelegramConnected, setIsTelegramConnected] =
+        useState(false);
+
     const [isLoading, setIsLoading] = useState(true);
 
     const clearUser = useCallback(() => {
@@ -98,6 +103,7 @@ export function UserProvider({
         setProfile(null);
         setClientProfile(null);
         setCraftsmanProfile(null);
+        setIsTelegramConnected(false);
     }, []);
 
     const loadUser = useCallback(
@@ -134,6 +140,8 @@ export function UserProvider({
                 setProfile(null);
                 setClientProfile(null);
                 setCraftsmanProfile(null);
+                setIsTelegramConnected(false);
+
                 return;
             }
 
@@ -141,6 +149,8 @@ export function UserProvider({
                 setProfile(null);
                 setClientProfile(null);
                 setCraftsmanProfile(null);
+                setIsTelegramConnected(false);
+
                 return;
             }
 
@@ -158,6 +168,43 @@ export function UserProvider({
             };
 
             setProfile(normalizedProfile);
+
+            /*
+             * Telegram is only relevant for client/craftsman
+             * accounts. Match the connection to the user's role
+             * so a client connection doesn't count as a craftsman
+             * connection, and vice versa.
+             */
+            if (
+                profileData.role === "client" ||
+                profileData.role === "craftsman"
+            ) {
+                const {
+                    data: telegramConnection,
+                    error: telegramError,
+                } = await supabase
+                    .from("telegram_connections")
+                    .select("id")
+                    .eq("user_id", authUser.id)
+                    .eq("bot_type", profileData.role)
+                    .eq("is_active", true)
+                    .maybeSingle();
+
+                if (telegramError) {
+                    console.error(
+                        "Failed to load Telegram connection:",
+                        telegramError,
+                    );
+
+                    setIsTelegramConnected(false);
+                } else {
+                    setIsTelegramConnected(
+                        Boolean(telegramConnection),
+                    );
+                }
+            } else {
+                setIsTelegramConnected(false);
+            }
 
             if (profileData.role === "client") {
                 const {
@@ -351,6 +398,10 @@ export function UserProvider({
             case "client":
                 return [
                     {
+                        label: "ربط تيليجرام",
+                        completed: isTelegramConnected,
+                    },
+                    {
                         label: "إضافة صورة شخصية",
                         completed: Boolean(
                             profile.avatar_url,
@@ -378,6 +429,10 @@ export function UserProvider({
 
             case "craftsman":
                 return [
+                    {
+                        label: "ربط تيليجرام",
+                        completed: isTelegramConnected,
+                    },
                     {
                         label: "إضافة صورة شخصية",
                         completed: Boolean(
@@ -430,6 +485,7 @@ export function UserProvider({
         profile,
         clientProfile,
         craftsmanProfile,
+        isTelegramConnected,
     ]);
 
     const completedSteps = useMemo(
@@ -498,6 +554,8 @@ export function UserProvider({
             clientProfile,
             craftsmanProfile,
 
+            isTelegramConnected,
+
             onboardingSteps,
             completedSteps,
             onboardingPercentage,
@@ -513,6 +571,7 @@ export function UserProvider({
             profile,
             clientProfile,
             craftsmanProfile,
+            isTelegramConnected,
             onboardingSteps,
             completedSteps,
             onboardingPercentage,

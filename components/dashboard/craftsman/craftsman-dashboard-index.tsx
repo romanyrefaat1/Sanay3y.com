@@ -277,79 +277,96 @@ export default function CraftsmanDashboardIndex() {
                         </Card>
                     </Link>
 
-                    {/* Onboarding */}
-                    <Card>
-                        <CardContent className="p-5">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <h2 className="font-semibold">
-                                        أكمل ملفك
-                                    </h2>
+                   {/* Onboarding */}
+{onboardingSteps.some((item)=> item.completed !== true) && <Card>
+    <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+            <div>
+                <h2 className="font-semibold">
+                    كمّل ملفك
+                </h2>
 
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {completedSteps} من{" "}
-                                        {onboardingSteps.length} مكتملة
-                                    </p>
-                                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                    {completedSteps} من{" "}
+                    {onboardingSteps.length} مكتملة
+                </p>
+            </div>
 
-                                <span className="text-sm font-semibold text-primary">
-                                    {onboardingPercentage}%
-                                </span>
-                            </div>
+            <span className="text-sm font-semibold text-primary">
+                {onboardingPercentage}%
+            </span>
+        </div>
 
-                            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
-                                <div
-                                    className="h-full rounded-full bg-primary transition-all"
-                                    style={{
-                                        width: `${onboardingPercentage}%`,
-                                    }}
-                                />
-                            </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+                className="h-full rounded-full bg-primary transition-all"
+                style={{
+                    width: `${onboardingPercentage}%`,
+                }}
+            />
+        </div>
 
-                            <div className="mt-5 space-y-3">
-                                {onboardingSteps.map((step) => (
-                                    <div
-                                        key={step.label}
-                                        className="flex items-center gap-3"
-                                    >
-                                        {step.completed ? (
-                                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                                <Check className="h-3.5 w-3.5" />
-                                            </span>
-                                        ) : (
-                                            <span className="h-5 w-5 shrink-0 rounded-full border-2 border-muted-foreground/30" />
-                                        )}
+        <div className="mt-5 space-y-2">
+            {[
+                ...onboardingSteps.filter(
+                    (step) => !step.completed,
+                ),
+                ...onboardingSteps.filter(
+                    (step) => step.completed,
+                ),
+            ].map((step) => (
+                <div
+                    key={step.label}
+                    className={
+                        step.completed
+                            ? "flex items-center gap-3 rounded-md px-2 py-2"
+                            : "flex items-center gap-3 rounded-md px-2 py-2"
+                    }
+                >
+                    {step.completed ? (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Check className="h-3.5 w-3.5" />
+                        </span>
+                    ) : (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-1">
+                            <span className="h-2 w-2 rounded-full" />
+                        </span>
+                    )}
 
-                                        <span
-                                            className={
-                                                step.completed
-                                                    ? "text-sm"
-                                                    : "text-sm text-muted-foreground"
-                                            }
-                                        >
-                                            {step.label}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
+                    <span
+                        className={
+                            step.completed
+                                ? "text-sm text-muted-foreground"
+                                : "text-sm font-medium text-foreground"
+                        }
+                    >
+                        {step.label}
+                    </span>
 
-                            {completedSteps <
-                                onboardingSteps.length && (
-                                <Link
-                                    href="/craftsman/profile/edit"
-                                    className="mt-5 block"
-                                >
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full"
-                                    >
-                                        استكمال الملف
-                                    </Button>
-                                </Link>
-                            )}
-                        </CardContent>
-                    </Card>
+                    {!step.completed && (
+                        <span className="mr-auto text-xs font-medium text-primary">
+                            مطلوب
+                        </span>
+                    )}
+                </div>
+            ))}
+        </div>
+
+        {completedSteps < onboardingSteps.length && (
+            <Link
+                href="/craftsman/profile/edit"
+                className="mt-5 block"
+            >
+                <Button
+                    size="sm"
+                    className="w-full"
+                >
+                    كمّل ملفك
+                </Button>
+            </Link>
+        )}
+    </CardContent>
+</Card>}
 
                     {/* Availability */}
                     <Card>
