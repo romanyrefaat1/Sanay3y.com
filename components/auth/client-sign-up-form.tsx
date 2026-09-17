@@ -4,12 +4,6 @@ import { useState } from "react";
 import { Check, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -113,15 +107,15 @@ export function ClientSignupForm() {
     }
 
     const result = await createNewUser({
-  email,
-  password,
-  fullName,
-  role: "client",
-  latitude: location.latitude,
-  longitude: location.longitude,
-  phone,
-  gender: gender as "male" | "female",
-});
+      email,
+      password,
+      fullName,
+      role: "client",
+      latitude: location.latitude,
+      longitude: location.longitude,
+      phone,
+      gender: gender as "male" | "female",
+    });
 
     if (!result.success) {
       setError(result.error);
@@ -133,112 +127,111 @@ export function ClientSignupForm() {
   }
 
   return (
-    <Card className="border-border/60 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-xl">إنشاء حسابك</CardTitle>
-      </CardHeader>
+    <form onSubmit={handleSubmit}>
+      {/* Section: account */}
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="fullName">الاسم بالكامل</Label>
+          <Input
+            id="fullName"
+            name="fullName"
+            placeholder="أحمد محمد"
+            autoComplete="name"
+            required
+          />
+        </div>
 
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">الاسم بالكامل</Label>
-            <Input
-              id="fullName"
-              name="fullName"
-              placeholder="أحمد محمد"
-              autoComplete="name"
-              required
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">البريد الإلكتروني</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="email"
+            dir="ltr"
+            required
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">البريد الإلكتروني</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              dir="ltr"
-              required
-            />
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">كلمة المرور</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="••••••••"
+            autoComplete="new-password"
+            dir="ltr"
+            minLength={6}
+            required
+          />
+        </div>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">كلمة المرور</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              autoComplete="new-password"
-              dir="ltr"
-              minLength={6}
-              required
-            />
-          </div>
+      {/* Section: contact */}
+      <div className="mt-8 space-y-5 border-t border-border pt-8">
+        <div className="space-y-2">
+          <Label htmlFor="phone">رقم الهاتف</Label>
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            placeholder="01XXXXXXXXX"
+            autoComplete="tel"
+            dir="ltr"
+            required
+          />
+          <p className="text-xs text-muted-foreground">
+            رقم هاتفك سيظل خاصًا ولن يظهر للآخرين.
+          </p>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">رقم الهاتف</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              placeholder="01XXXXXXXXX"
-              autoComplete="tel"
-              dir="ltr"
-              required
-            />
+        <div className="space-y-3">
+          <Label>النوع</Label>
 
-            <p className="text-xs text-muted-foreground">
-              رقم هاتفك سيظل خاصًا ولن يظهر للآخرين.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <Label>النوع</Label>
-
-            <RadioGroup
-              name="gender"
-              defaultValue="male"
-              className="grid grid-cols-2 gap-3"
+          <RadioGroup
+            name="gender"
+            defaultValue="male"
+            className="grid grid-cols-2 gap-3"
+          >
+            <Label
+              htmlFor="male"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 font-normal transition-colors hover:bg-accent has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
             >
-              <Label
-                htmlFor="male"
-                className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal transition-colors hover:bg-accent"
-              >
-                <RadioGroupItem value="male" id="male" />
-                ذكر
-              </Label>
+              <RadioGroupItem value="male" id="male" />
+              ذكر
+            </Label>
 
-              <Label
-                htmlFor="female"
-                className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal transition-colors hover:bg-accent"
-              >
-                <RadioGroupItem value="female" id="female" />
-                أنثى
-              </Label>
-            </RadioGroup>
-          </div>
+            <Label
+              htmlFor="female"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 font-normal transition-colors hover:bg-accent has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-accent"
+            >
+              <RadioGroupItem value="female" id="female" />
+              أنثى
+            </Label>
+          </RadioGroup>
+        </div>
+      </div>
 
-          <div className="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
-            <div>
-              <p className="text-sm font-medium">
-                حدد موقعك
-              </p>
+      {/* Section: location */}
+      <div className="mt-8 border-t border-border pt-8">
+        <div className="flex items-start gap-3">
+          <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
 
-              <p className="mt-1 text-xs text-muted-foreground">
-                نحتاج إلى موقعك لنعرض لك الصنايعية القريبين منك.
-                لن يظهر موقعك الدقيق للمستخدمين الآخرين.
-              </p>
-            </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">حدد موقعك</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              نحتاج إلى موقعك لنعرض لك الصنايعية القريبين منك. لن يظهر موقعك
+              الدقيق للمستخدمين الآخرين.
+            </p>
 
             <Button
               type="button"
               variant={location ? "outline" : "default"}
               onClick={getLocation}
               disabled={isGettingLocation || isLoading}
-              className="w-full gap-2"
+              className="mt-3 w-full gap-2 sm:w-auto"
             >
               {location ? (
                 <>
@@ -254,31 +247,24 @@ export function ClientSignupForm() {
                 </>
               )}
             </Button>
-
-            {location && (
-              <p className="text-xs text-muted-foreground">
-                تم حفظ موقعك لاستخدامه في العثور على الخدمات القريبة منك.
-              </p>
-            )}
           </div>
+        </div>
+      </div>
 
-          {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
+      {error && (
+        <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || isGettingLocation || !location}
-          >
-            {isLoading
-              ? "جاري إنشاء الحساب..."
-              : "إنشاء الحساب"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+      <Button
+        type="submit"
+        className="mt-8 w-full"
+        size="lg"
+        disabled={isLoading || isGettingLocation || !location}
+      >
+        {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
+      </Button>
+    </form>
   );
 }

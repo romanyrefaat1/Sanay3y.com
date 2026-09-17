@@ -14,6 +14,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/contexts/user-context";
 
 const exampleApplicants = [
   { name: "أحمد محمد", experience: "8 سنين خبرة", initials: "أم" },
@@ -23,6 +24,7 @@ const exampleApplicants = [
 
 export default function HomePage() {
   const router = useRouter();
+  const {user} = useUser()
 
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,72 +62,96 @@ export default function HomePage() {
           NAVBAR — الصفحة مخصصة للعميل فقط (روابط "أنا صنايعي" اتشالت)
           ========================================================= */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="font-cairo text-[20px] font-bold tracking-tight"
-            aria-label="صنايعي.كوم - الرئيسية"
-          >
-            صنايعي<span className="text-primary">.</span>كوم
+  <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <Link
+      href="/"
+      className="font-cairo text-[20px] font-bold tracking-tight"
+      aria-label="صنايعي.كوم - الرئيسية"
+    >
+      صنايعي<span className="text-primary">.</span>كوم
+    </Link>
+
+    <nav className="hidden items-center gap-4 md:flex" aria-label="التنقل الرئيسي">
+      {user ? (
+        <Link href="/dashboard">
+          <Button className="inline-flex h-9 items-center justify-center bg-foreground px-4 text-sm font-bold text-background transition-colors hover:bg-primary-foreground/90">
+            لوحة التحكم
+          </Button>
+        </Link>
+      ) : (
+        <>
+          <Link href="/auth/login" className="inline-flex h-9">
+            <Button variant="ghost" className="hover:bg-transparent">
+              دخول
+            </Button>
           </Link>
 
-          <nav className="hidden items-center gap-4 md:flex" aria-label="التنقل الرئيسي">
-            <Link href="/auth/login" className="inline-flex h-9">
-              <Button variant="ghost" className="hover:bg-transparent">
+          <Link href="/auth/sign-up">
+            <Button className="inline-flex h-9 items-center justify-center bg-foreground px-4 text-sm font-bold text-background transition-colors hover:bg-primary-foreground/90">
+              اعمل حساب جديد
+            </Button>
+          </Link>
+        </>
+      )}
+    </nav>
+
+    <button
+      type="button"
+      onClick={() => setMobileMenuOpen((open) => !open)}
+      className="inline-flex h-10 w-10 items-center justify-center border border-border md:hidden"
+      aria-label={mobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
+      aria-expanded={mobileMenuOpen}
+    >
+      {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+    </button>
+  </div>
+
+  {mobileMenuOpen && (
+    <div className="border-t border-border bg-background md:hidden">
+      <nav
+        className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6"
+        aria-label="قائمة الهاتف"
+      >
+        {user ? (
+          <Link
+            href="/dashboard"
+            onClick={() => setMobileMenuOpen(false)}
+            className="w-full"
+          >
+            <Button className="h-11 w-full justify-center bg-foreground text-sm font-bold text-background hover:bg-primary">
+              لوحة التحكم
+            </Button>
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/auth/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full"
+            >
+              <Button
+                variant="ghost"
+                className="h-11 w-full justify-center text-sm font-semibold hover:bg-muted"
+              >
                 دخول
               </Button>
             </Link>
 
-            <Link href="/client/auth/sign-up">
-              <Button className="inline-flex h-9 items-center justify-center bg-foreground px-4 text-sm font-bold text-background transition-colors hover:bg-primary-foreground/90">
+            <Link
+              href="/auth/sign-up"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full"
+            >
+              <Button className="h-11 w-full justify-center bg-foreground text-sm font-bold text-background hover:bg-primary">
                 اعمل حساب جديد
               </Button>
             </Link>
-          </nav>
-
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            className="inline-flex h-10 w-10 items-center justify-center border border-border md:hidden"
-            aria-label={mobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
-            aria-expanded={mobileMenuOpen}
-          >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
-
-        {mobileMenuOpen && (
-          <div className="border-t border-border bg-background md:hidden">
-            <nav
-              className="mx-auto flex w-full max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6"
-              aria-label="قائمة الهاتف"
-            >
-              <Link
-                href="/auth/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full"
-              >
-                <Button
-                  variant="ghost"
-                  className="h-11 w-full justify-center text-sm font-semibold hover:bg-muted"
-                >
-                  دخول
-                </Button>
-              </Link>
-
-              <Link
-                href="/client/auth/sign-up"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full"
-              >
-                <Button className="h-11 w-full justify-center bg-foreground text-sm font-bold text-background hover:bg-primary">
-                  اعمل حساب جديد
-                </Button>
-              </Link>
-            </nav>
-          </div>
+          </>
         )}
-      </header>
+      </nav>
+    </div>
+  )}
+</header>
 
       {/* =========================================================
           HERO — يفتح بكلمات تعكس خوف العميل والتركيز على مشكلته

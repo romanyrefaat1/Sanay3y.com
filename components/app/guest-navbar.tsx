@@ -72,7 +72,7 @@ export function GuestNavbar() {
                         </Button>
                     </Link>
 
-                    <Link href="/client/auth/sign-up">
+                    <Link href="/auth/sign-up">
                         <Button variant="secondary">
                             إنشاء حساب
                         </Button>

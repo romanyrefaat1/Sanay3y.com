@@ -7,18 +7,20 @@ import {
   Search,
   PlusCircle,
   MessageSquare,
+  ClipboardList,
   User,
 } from "lucide-react";
 
 import { Button } from "../ui/button";
 import { useUser } from "@/contexts/user-context";
+import { MobileBottomNav, type MobileNavItem } from "./mobile-bottom-nav";
 
-const clientNavItems = [
+const clientNavItems: MobileNavItem[] = [
   { href: "/dashboard", label: "الرئيسية", icon: Home },
   { href: "/client/find", label: "دور على صنايعي", icon: Search },
   { href: "/client/job/new", label: "أضف شغلانة", icon: PlusCircle },
   { href: "/chats", label: "الرسائل", icon: MessageSquare },
-  { href: "/client/my-job-offers", label: "عروضي", icon: MessageSquare },
+  { href: "/client/my-job-offers", label: "عروضي", icon: ClipboardList },
   { href: "/profile", label: "حسابي", icon: User, isProfile: true },
 ];
 
@@ -29,6 +31,14 @@ export function ClientNavbar() {
   const profileHref = profile?.id
     ? `/profile/${profile.id}`
     : "/profile";
+
+  const resolveHref = (item: MobileNavItem) =>
+    item.isProfile ? profileHref : item.href;
+
+  const isActive = (item: MobileNavItem) =>
+    item.isProfile
+      ? !!profile?.id && pathname === `/profile/${profile.id}`
+      : pathname === item.href;
 
   return (
     <>
@@ -48,14 +58,8 @@ export function ClientNavbar() {
           {clientNavItems
             .filter((item) => item.href !== "/client/job/new")
             .map((item) => {
-              const href = item.isProfile
-                ? profileHref
-                : item.href;
-
-              const active = item.isProfile
-                ? !!profile?.id &&
-                  pathname === `/profile/${profile.id}`
-                : pathname === item.href;
+              const href = resolveHref(item);
+              const active = isActive(item);
 
               return (
                 <Link
@@ -96,49 +100,11 @@ export function ClientNavbar() {
       </nav>
 
       {/* Mobile bottom navbar */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full border-t border-border bg-background md:hidden">
-        <div className="flex w-full min-w-0">
-          {clientNavItems.map((item) => {
-            const href = item.isProfile
-              ? profileHref
-              : item.href;
-
-            const active = item.isProfile
-              ? !!profile?.id &&
-                pathname === `/profile/${profile.id}`
-              : pathname === item.href;
-
-            return (
-              <Link
-                key={item.href}
-                href={href}
-                className={[
-                  "relative flex min-w-0 flex-1 flex-col",
-                  "items-center justify-center gap-1",
-                  "min-h-[58px] py-2.5",
-                  "transition-colors",
-                  active
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {active && (
-                  <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
-                )}
-
-                <item.icon
-                  className="h-5 w-5 shrink-0"
-                  strokeWidth={active ? 2.4 : 2}
-                />
-
-                <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileBottomNav
+        items={clientNavItems}
+        isActive={isActive}
+        resolveHref={resolveHref}
+      />
     </>
   );
 }

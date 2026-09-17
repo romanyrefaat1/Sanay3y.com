@@ -4,12 +4,6 @@ import { useState } from "react";
 import { Check, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,9 +83,7 @@ export function CraftsmanSignupForm() {
       return;
     }
 
-    const experienceYears = experience
-      ? Number(experience)
-      : null;
+    const experienceYears = experience ? Number(experience) : null;
 
     if (
       experienceYears !== null &&
@@ -126,176 +118,163 @@ export function CraftsmanSignupForm() {
   }
 
   return (
-    <Card className="border-border/60 shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-xl">إنشاء حسابك</CardTitle>
-      </CardHeader>
-
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">الاسم الأول</Label>
-
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="أحمد"
-                autoComplete="given-name"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="secondName">الاسم الثاني</Label>
-
-              <Input
-                id="secondName"
-                name="secondName"
-                placeholder="محمد"
-                autoComplete="family-name"
-                required
-              />
-            </div>
-          </div>
-
+    <form onSubmit={handleSubmit}>
+      {/* Section: account */}
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="email">البريد الإلكتروني</Label>
-
+            <Label htmlFor="firstName">الاسم الأول</Label>
             <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              dir="ltr"
+              id="firstName"
+              name="firstName"
+              placeholder="أحمد"
+              autoComplete="given-name"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">كلمة المرور</Label>
-
+            <Label htmlFor="secondName">الاسم الثاني</Label>
             <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              autoComplete="new-password"
-              dir="ltr"
-              minLength={6}
+              id="secondName"
+              name="secondName"
+              placeholder="محمد"
+              autoComplete="family-name"
               required
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">رقم الهاتف</Label>
+        <div className="space-y-2">
+          <Label htmlFor="email">البريد الإلكتروني</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="email"
+            dir="ltr"
+            required
+          />
+        </div>
 
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              placeholder="01XXXXXXXXX"
-              autoComplete="tel"
-              dir="ltr"
-              required
-            />
+        <div className="space-y-2">
+          <Label htmlFor="password">كلمة المرور</Label>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="••••••••"
+            autoComplete="new-password"
+            dir="ltr"
+            minLength={6}
+            required
+          />
+        </div>
+      </div>
 
-            <p className="text-xs text-muted-foreground">
-              رقم هاتفك سيظل خاصًا ولن يظهر للآخرين.
+      {/* Section: contact & phone */}
+      <div className="mt-8 space-y-5 border-t border-border pt-8">
+        <div className="space-y-2">
+          <Label htmlFor="phone">رقم الهاتف</Label>
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            placeholder="01XXXXXXXXX"
+            autoComplete="tel"
+            dir="ltr"
+            required
+          />
+          <p className="text-xs text-muted-foreground">
+            رقم هاتفك سيظل خاصًا ولن يظهر للآخرين.
+          </p>
+        </div>
+      </div>
+
+      {/* Section: professional profile */}
+      <div className="mt-8 space-y-5 border-t border-border pt-8">
+        <div className="space-y-2">
+          <Label htmlFor="experience">
+            سنوات الخبرة{" "}
+            <span className="mr-1 text-muted-foreground">(اختياري)</span>
+          </Label>
+          <Input
+            id="experience"
+            name="experience"
+            type="number"
+            min={0}
+            placeholder="5"
+            dir="ltr"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="bio">
+            نبذة عنك{" "}
+            <span className="mr-1 text-muted-foreground">(اختياري)</span>
+          </Label>
+          <Textarea
+            id="bio"
+            name="bio"
+            placeholder="اكتب نبذة بسيطة عن نفسك وعن شغلك..."
+            className="min-h-24 resize-none"
+            maxLength={300}
+          />
+        </div>
+      </div>
+
+      {/* Section: location */}
+      <div className="mt-8 border-t border-border pt-8">
+        <div className="flex items-start gap-3">
+          <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
+
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">حدد موقعك</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              نحتاج موقعك الحالي لمساعدتك في العثور على الشغلانات القريبة
+              منك. موقعك الدقيق لن يظهر للمستخدمين الآخرين.
             </p>
+
+            <Button
+              type="button"
+              variant={location ? "outline" : "default"}
+              className="mt-3 w-full gap-2 sm:w-auto"
+              onClick={getLocation}
+              disabled={isGettingLocation || isLoading}
+            >
+              {location ? (
+                <>
+                  <Check className="size-4" />
+                  تم تحديد موقعك
+                </>
+              ) : (
+                <>
+                  <MapPin className="size-4" />
+                  {isGettingLocation
+                    ? "جاري تحديد موقعك..."
+                    : "تحديد موقعي"}
+                </>
+              )}
+            </Button>
           </div>
+        </div>
+      </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="experience">
-              سنوات الخبرة{" "}
-              <span className="mr-1 text-muted-foreground">
-                (اختياري)
-              </span>
-            </Label>
+      {error && (
+        <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
-            <Input
-              id="experience"
-              name="experience"
-              type="number"
-              min={0}
-              placeholder="5"
-              dir="ltr"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bio">
-              نبذة عنك{" "}
-              <span className="mr-1 text-muted-foreground">
-                (اختياري)
-              </span>
-            </Label>
-
-            <Textarea
-              id="bio"
-              name="bio"
-              placeholder="اكتب نبذة بسيطة عن نفسك وعن شغلك..."
-              className="min-h-24 resize-none"
-              maxLength={300}
-            />
-          </div>
-
-          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
-            <div className="flex items-start gap-3">
-              <MapPin className="mt-0.5 size-5 shrink-0 text-primary" />
-
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  حدد موقعك
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  نحتاج موقعك الحالي لمساعدتك في العثور على
-                  الشغلانات القريبة منك. موقعك الدقيق لن يظهر
-                  للمستخدمين الآخرين.
-                </p>
-
-                <Button
-                  type="button"
-                  variant={location ? "outline" : "default"}
-                  className="mt-3 w-full gap-2"
-                  onClick={getLocation}
-                  disabled={isGettingLocation || isLoading}
-                >
-                  {location ? (
-                    <>
-                      <Check className="size-4" />
-                      تم تحديد موقعك
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="size-4" />
-                      {isGettingLocation
-                        ? "جاري تحديد موقعك..."
-                        : "تحديد موقعي"}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || isGettingLocation}
-          >
-            {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+      <Button
+        type="submit"
+        className="mt-8 w-full"
+        size="lg"
+        disabled={isLoading || isGettingLocation}
+      >
+        {isLoading ? "جاري إنشاء الحساب..." : "إنشاء الحساب"}
+      </Button>
+    </form>
   );
 }

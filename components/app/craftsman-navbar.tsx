@@ -12,8 +12,9 @@ import {
 } from "lucide-react";
 
 import { useUser } from "@/contexts/user-context";
+import { MobileBottomNav, type MobileNavItem } from "./mobile-bottom-nav";
 
-const craftsmanNavItems = [
+const craftsmanNavItems: MobileNavItem[] = [
   { href: "/dashboard", label: "الرئيسية", icon: Home },
   {
     href: "/craftsman/find",
@@ -50,6 +51,14 @@ export function CraftsmanNavbar({
     ? `/profile/${profile.id}`
     : "/profile";
 
+  const resolveHref = (item: MobileNavItem) =>
+    item.isProfile ? profileHref : item.href;
+
+  const isActive = (item: MobileNavItem) =>
+    item.isProfile
+      ? !!profile?.id && pathname === `/profile/${profile.id}`
+      : pathname === item.href;
+
   return (
     <>
       {/* Desktop top navbar */}
@@ -70,14 +79,8 @@ export function CraftsmanNavbar({
 
         <div className="flex h-full items-stretch">
           {craftsmanNavItems.map((item) => {
-            const href = item.isProfile
-              ? profileHref
-              : item.href;
-
-            const active = item.isProfile
-              ? !!profile?.id &&
-                pathname === `/profile/${profile.id}`
-              : pathname === item.href;
+            const href = resolveHref(item);
+            const active = isActive(item);
 
             return (
               <Link
@@ -115,48 +118,11 @@ export function CraftsmanNavbar({
       </nav>
 
       {/* Mobile bottom navbar */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 w-full max-w-screen border-t border-border bg-background md:hidden">
-        <div className="flex w-full min-w-0">
-          {craftsmanNavItems.map((item) => {
-            const href = item.isProfile
-              ? profileHref
-              : item.href;
-
-            const active = item.isProfile
-              ? !!profile?.id &&
-                pathname === `/profile/${profile.id}`
-              : pathname === item.href;
-
-            return (
-              <Link
-                key={item.href}
-                href={href}
-                className={[
-                  "relative flex min-w-0 flex-1 flex-col",
-                  "min-h-[58px] items-center justify-center gap-1 py-2.5",
-                  "transition-colors",
-                  active
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                ].join(" ")}
-              >
-                {active && (
-                  <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
-                )}
-
-                <item.icon
-                  className="h-5 w-5 shrink-0"
-                  strokeWidth={active ? 2.4 : 2}
-                />
-
-                <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
-                  {item.label}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileBottomNav
+        items={craftsmanNavItems}
+        isActive={isActive}
+        resolveHref={resolveHref}
+      />
     </>
   );
 }

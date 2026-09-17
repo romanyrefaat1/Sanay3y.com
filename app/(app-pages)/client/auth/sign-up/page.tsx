@@ -35,6 +35,15 @@ export default function ClientSignupPage() {
             تسجيل الدخول
           </Link>
         </p>
+         <p className="mt-6 text-center text-sm text-muted-foreground">
+          انت صنايعي؟{" "}
+          <Link
+            href="/craftsman/auth/sign-up"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            اضغط هنا
+          </Link>
+        </p>
       </div>
     </main>
   );
