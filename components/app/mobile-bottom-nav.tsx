@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MoreHorizontal, X, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 export type MobileNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  mobileIcon?: ReactNode;
   isProfile?: boolean;
 };
 
@@ -25,8 +27,6 @@ export function MobileBottomNav({
 }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
-  // Profile stays pinned at the end. Everything else is split into
-  // what's visible in the bar and what goes behind "More".
   const profileItem = items.find((item) => item.isProfile);
   const restItems = items.filter((item) => !item.isProfile);
 
@@ -39,7 +39,9 @@ export function MobileBottomNav({
 
   useEffect(() => {
     if (!isMoreOpen) return;
+
     document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = "";
     };
@@ -51,8 +53,23 @@ export function MobileBottomNav({
       "items-center justify-center gap-1",
       "min-h-[58px] py-2.5",
       "transition-colors",
-      active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+      active
+        ? "text-primary"
+        : "text-muted-foreground hover:text-foreground",
     ].join(" ");
+
+  const renderIcon = (item: MobileNavItem, active: boolean) => {
+    if (item.mobileIcon) {
+      return item.mobileIcon;
+    }
+
+    return (
+      <item.icon
+        className="h-5 w-5 shrink-0"
+        strokeWidth={active ? 2.4 : 2}
+      />
+    );
+  };
 
   return (
     <>
@@ -67,10 +84,9 @@ export function MobileBottomNav({
                 {active && (
                   <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
                 )}
-                <item.icon
-                  className="h-5 w-5 shrink-0"
-                  strokeWidth={active ? 2.4 : 2}
-                />
+
+                {renderIcon(item, active)}
+
                 <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
                   {item.label}
                 </span>
@@ -89,10 +105,12 @@ export function MobileBottomNav({
               {overflowIsActive && (
                 <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
               )}
+
               <MoreHorizontal
                 className="h-5 w-5 shrink-0"
                 strokeWidth={overflowIsActive ? 2.4 : 2}
               />
+
               <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
                 المزيد
               </span>
@@ -107,10 +125,9 @@ export function MobileBottomNav({
               {isActive(profileItem) && (
                 <span className="absolute inset-x-5 top-0 h-[2px] rounded-b-full bg-primary" />
               )}
-              <profileItem.icon
-                className="h-5 w-5 shrink-0"
-                strokeWidth={isActive(profileItem) ? 2.4 : 2}
-              />
+
+              {renderIcon(profileItem, isActive(profileItem))}
+
               <span className="max-w-full truncate px-1 text-[10.5px] font-medium leading-none">
                 {profileItem.label}
               </span>
@@ -124,7 +141,9 @@ export function MobileBottomNav({
         <div
           className={[
             "fixed inset-0 z-[60] md:hidden",
-            isMoreOpen ? "pointer-events-auto" : "pointer-events-none",
+            isMoreOpen
+              ? "pointer-events-auto"
+              : "pointer-events-none",
           ].join(" ")}
           aria-hidden={!isMoreOpen}
         >
@@ -140,13 +159,16 @@ export function MobileBottomNav({
             className={[
               "absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-border bg-background shadow-lg transition-transform duration-200",
               "pb-[calc(env(safe-area-inset-bottom)+16px)]",
-              isMoreOpen ? "translate-y-0" : "translate-y-full",
+              isMoreOpen
+                ? "translate-y-0"
+                : "translate-y-full",
             ].join(" ")}
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <span className="text-sm font-semibold text-foreground">
                 كل الأقسام
               </span>
+
               <button
                 type="button"
                 onClick={() => setIsMoreOpen(false)}
@@ -174,10 +196,8 @@ export function MobileBottomNav({
                         : "border-border text-foreground hover:bg-accent",
                     ].join(" ")}
                   >
-                    <item.icon
-                      className="h-5 w-5"
-                      strokeWidth={active ? 2.4 : 2}
-                    />
+                    {renderIcon(item, active)}
+
                     <span className="text-xs font-medium leading-tight">
                       {item.label}
                     </span>

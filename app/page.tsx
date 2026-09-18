@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/user-context";
+import Image from "next/image";
 
 const exampleApplicants = [
   { name: "أحمد محمد", experience: "8 سنين خبرة", initials: "أم" },
@@ -68,7 +69,7 @@ export default function HomePage() {
       className="font-cairo text-[20px] font-bold tracking-tight"
       aria-label="صنايعي.كوم - الرئيسية"
     >
-      صنايعي<span className="text-primary">.</span>كوم
+      <Image src={"/brand/logos/wordmark-no-bg.png"} width={200} height={200} alt="Logo of a craftsman marketplace: صنايعي.كوم" />
     </Link>
 
     <nav className="hidden items-center gap-4 md:flex" aria-label="التنقل الرئيسي">

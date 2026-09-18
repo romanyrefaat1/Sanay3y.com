@@ -911,7 +911,7 @@ export default async function ProfilePage({
                                         <Link
                                             href={`/client/job/new?craftsman=${id}`}
                                         >
-                                            <Button className="gap-2">
+                                            <Button className="gap-2 bg-primary">
                                                 <Send className="h-4 w-4" />
                                                 ابعت للصنايعي ده عرض جديد
                                             </Button>

@@ -13,6 +13,7 @@ import {
 
 import { useUser } from "@/contexts/user-context";
 import { MobileBottomNav, type MobileNavItem } from "./mobile-bottom-nav";
+import Image from "next/image";
 
 const craftsmanNavItems: MobileNavItem[] = [
   { href: "/dashboard", label: "الرئيسية", icon: Home },
@@ -70,9 +71,8 @@ export function CraftsmanNavbar({
             fontFamily: "var(--font-cairo)",
           }}
         >
-          صنايعي
-          <span className="text-white/70">.</span>
-          كوم
+               <Image src={"/brand/logos/wordmark-no-bg.png"} width={200} height={200} alt="Logo of a craftsman marketplace: صنايعي.كوم" />
+
         </Link>
 
         <div className="h-6 w-px bg-white/20" />

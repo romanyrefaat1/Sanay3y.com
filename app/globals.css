@@ -63,7 +63,9 @@
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
 
-    --primary: 217 91% 60%;
+    /* --primary: 217 91% 60%; */
+    /* --primary: #112d52;  */
+    --primary: 212 66% 19%; 
     --primary-foreground: 0 0% 100%;
 
     /* ================================
@@ -150,6 +152,7 @@
     --foreground: 210 40% 98%;
 
     --primary: 217 91% 60%;
+    /* --primary: 212 85% 62%;  */
     --primary-foreground: 0 0% 100%;
 
     --card: 222 47% 10%;
@@ -564,5 +567,50 @@ a, button {
 
     * {
         scroll-behavior: auto !important;
+    }
+}
+
+/* DEFAULT LOADING SCREEN */
+@keyframes logo-in {
+    0% {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+        filter: blur(6px);
+    }
+
+    60% {
+        opacity: 1;
+        filter: blur(0);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+@keyframes loading-bar {
+    0% {
+        transform: translateX(220%);
+    }
+
+    100% {
+        transform: translateX(-220%);
+    }
+}
+
+.animate-logo-in {
+    animation: logo-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-loading-bar {
+    animation: loading-bar 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-logo-in,
+    .animate-loading-bar {
+        animation: none;
     }
 }
