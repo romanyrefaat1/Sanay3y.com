@@ -477,7 +477,7 @@ export default function ClientDashboardIndex() {
                                         variant="outline"
                                         className="w-full sm:w-auto"
                                     >
-                                        اعمل شغلانة جديدة
+                                        اعرض شغلانة جديدة
                                     </Button>
                                 </Link>
                             </div>
